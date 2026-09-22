@@ -2,6 +2,7 @@ import { useEffect, type CSSProperties, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { sportById, sportColor } from '../core/sports'
 import { Icon } from './Icon'
+import { SportIllustration } from './SportIllustration'
 
 export function Avatar({ name, photo, size = 44, ring = false }: { name: string; photo?: string; size?: number; ring?: boolean }) {
   const className = `avatar${ring ? ' avatar-ring' : ''}`
@@ -20,7 +21,7 @@ export function SportBadge({ sportID }: { sportID: string }) {
   if (!sport) return null
   return (
     <span className="badge" style={{ '--c': sportColor(sportID) } as CSSProperties}>
-      <span aria-hidden="true">{sport.emoji}</span> {sport.name}
+      <SportIllustration sportID={sportID} className="sport-art-inline" /> {sport.name}
     </span>
   )
 }
@@ -119,7 +120,7 @@ export function SportHexes({ items }: { items: { sportID: string; sub?: ReactNod
         return (
           <div className="hex-item" key={sportID}>
             <HexBadge color={sportColor(sportID)}>
-              <span aria-hidden="true">{sport.emoji}</span>
+              <SportIllustration sportID={sportID} className="sport-art-hex" />
             </HexBadge>
             <span className="hex-name">{sport.name}</span>
             {sub && <span className="hex-sub">{sub}</span>}

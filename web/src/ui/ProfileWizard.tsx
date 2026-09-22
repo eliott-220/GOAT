@@ -36,6 +36,8 @@ export function StepProgress({ current, total }: { current: number; total: numbe
 interface ProfileWizardProps {
   /** Valeurs de départ (ex. le prénom donné par Google). */
   initial?: Partial<WizardDraft>
+  /** Erreur de l'enregistrement final, affichée sans quitter la dernière étape. */
+  externalError?: string
   /** Numéro de la 1re étape de l'assistant dans le parcours complet, et nombre total d'étapes (ex. 2 sur 4 si « Compte » vient avant). */
   progress: { first: number; total: number }
   /** Retour vers l'étape d'avant l'assistant (ex. « Compte »). Reçoit la saisie, pour la retrouver au retour. */
@@ -52,7 +54,7 @@ interface ProfileWizardProps {
  * Profil en trois étapes : prénom + âge + style de sportif, puis les sports, puis la localisation (opt-in explicite).
  * Sert à l'inscription (le compte n'est créé qu'à la fin) comme à la première connexion avec Google.
  */
-export function ProfileWizard({ initial, progress, onBack, finish, onFinish, extraAction }: ProfileWizardProps) {
+export function ProfileWizard({ initial, externalError, progress, onBack, finish, onFinish, extraAction }: ProfileWizardProps) {
   const [draft, setDraft] = useState<WizardDraft>({ ...EMPTY_DRAFT, ...initial })
   const [step, setStep] = useState<Step>('profile')
   const [problem, setProblem] = useState<string>()
@@ -175,10 +177,11 @@ export function ProfileWizard({ initial, progress, onBack, finish, onFinish, ext
         </div>
         <h1>Ta position, ton choix</h1>
         <ul className="bullets">
-          <li>Ta position n'est utilisée que pendant une session de sport.</li>
+          <li>Ta position n'est partagée que pendant une session de sport.</li>
           <li>Les autres ne voient qu'une zone approximative (~150 m), jamais ta position exacte.</li>
           <li>Tu peux te rendre invisible à tout moment.</li>
         </ul>
+        {externalError && <p className="form-error" role="alert">{externalError}</p>}
       </div>
       <button className="btn btn-primary btn-block btn-large" disabled={busy} onClick={() => void submit(true)}>
         {busy ? <span className="spinner on-accent" aria-label="Chargement" /> : finish.allow}

@@ -19,7 +19,7 @@ const TABS: { id: PeopleTab; label: string }[] = [
 function reason(user: User, sharedSportID?: string): string {
   if (sharedSportID) {
     const sport = sportById(sharedSportID)
-    return sport ? `${sport.emoji} Pratique aussi ${sport.name.toLowerCase()}` : ''
+    return sport ? `Pratique aussi ${sport.name.toLowerCase()}` : ''
   }
   const sports = userSportIDs(user).map(sportName)
   return sports.length > 0 ? sports.join(' · ') : 'Nouveau sur GOAT'

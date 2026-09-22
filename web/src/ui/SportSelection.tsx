@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react'
-import { CATEGORIES, CATEGORY_LABELS, searchSports, sportById, sportColor, type Sport, type SportCategory } from '../core/sports'
+import { CATEGORIES, CATEGORY_LABELS, searchSports, sportById, type Sport, type SportCategory } from '../core/sports'
 import { makePrimary, toggleSport, type UserSport } from '../core/models'
 import { Icon } from './Icon'
+import { SportIllustration } from './SportIllustration'
 
 /**
  * Choix des sports pratiqués + sport principal. Utilisé à l'inscription et dans le profil.
@@ -92,9 +93,7 @@ function SportRow({ sport, entry, onToggle, onPrimary }: { sport: Sport; entry?:
   return (
     <div className="row">
       <button className="row-button" aria-pressed={entry !== undefined} onClick={onToggle}>
-        <span className="sport-emoji" style={{ background: `${sportColor(sport.id)}26` }} aria-hidden="true">
-          {sport.emoji}
-        </span>
+        <SportIllustration sportID={sport.id} />
         <span className="row-title">{sport.name}</span>
         <span className={`check ${entry ? 'on' : ''}`} aria-hidden="true">
           {entry && <Icon name="check" size={14} />}

@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { hasMePin } from '../core/models'
-import { SPORTS, sportById, sportName } from '../core/sports'
+import { SPORTS, sportName } from '../core/sports'
 import { useApp, useNow } from '../state/context'
 import { Avatar, Logo } from './common'
 import { formatTimer } from './format'
 import { Icon } from './Icon'
 import { MapView, type CameraState, type MapViewHandle } from './MapView'
+import { SportIllustration } from './SportIllustration'
 import { MiniProfileSheet, SessionSheet, StartSessionSheet } from './sheets'
 
 /** Fréquence de rafraîchissement du point "ma position" hors session : juste assez pour suivre un déplacement lent,
@@ -34,6 +35,7 @@ export function MapTab({ active, onOpenProfile }: { active: boolean; onOpenProfi
   }, [snap.pins, snap.me?.sports, sportFilter])
   const invisible = snap.me?.visibility.isInvisible === true
   const first = snap.mySessions[0]
+  const activeCount = pins.filter((pin) => pin.status === 'active' && !pin.isMe).length
 
   // Point "ma position" : seulement quand aucun pin de session ne me représente déjà (sinon double affichage).
   const locationGranted = snap.location.authorization === 'granted'
@@ -98,9 +100,14 @@ export function MapTab({ active, onOpenProfile }: { active: boolean; onOpenProfi
               aria-pressed={sportFilter === sport.id}
               onClick={() => app.setSportFilter(sportFilter === sport.id ? undefined : sport.id)}
             >
-              <span aria-hidden="true">{sport.emoji}</span> {sport.name}
+              <SportIllustration sportID={sport.id} className="sport-art-inline" /> {sport.name}
             </button>
           ))}
+        </div>
+        <div className="map-presence" role="status">
+          <span className="live-dot" aria-hidden="true" />
+          {app.supportsDemoTools ? 'Démo' : 'En ce moment'} · {activeCount} sportif{activeCount === 1 ? '' : 's'}
+          {app.supportsDemoTools ? ' simulé' : ' actif'}{activeCount === 1 ? '' : 's'}
         </div>
       </div>
 
@@ -170,9 +177,7 @@ function LiveSession({ sportID, count, startedAt, onClick }: { sportID: string; 
   const now = useNow()
   return (
     <button className="dock-live" onClick={onClick}>
-      <span className="sport-emoji" aria-hidden="true">
-        {sportById(sportID)?.emoji}
-      </span>
+      <SportIllustration sportID={sportID} />
       <span className="dock-live-name">
         {sportName(sportID)}
         {count > 1 && <small>+ {count - 1} autre{count > 2 ? 's' : ''} session{count > 2 ? 's' : ''}</small>}

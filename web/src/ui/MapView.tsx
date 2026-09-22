@@ -7,7 +7,8 @@ import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
 import { clusterPins, type MapMarker } from '../core/clustering'
 import type { GeoCoordinate } from '../core/geohash'
 import type { PresencePin } from '../core/models'
-import { CATEGORY_COLORS, CATEGORY_EMOJI, CATEGORY_LABELS, sportById, sportColor, sportName } from '../core/sports'
+import { CATEGORY_COLORS, CATEGORY_LABELS, sportColor, sportName } from '../core/sports'
+import { categoryIllustrationMarkup, sportIllustrationMarkup } from './SportIllustration'
 import { themeMapStyle } from './mapStyle'
 
 setWorkerUrl(workerUrl)
@@ -101,7 +102,7 @@ function renderPin(root: HTMLElement, pin: PresencePin, highlighted?: string): v
   const pulse = pin.isMe && pin.status === 'active' ? '<span class="pin-pulse"></span>' : ''
   const live = pin.status === 'active' ? '<span class="pin-live"></span>' : ''
   const more = pin.sportIDs.length > 1 ? `<span class="pin-more">+${pin.sportIDs.length - 1}</span>` : ''
-  button.innerHTML = `${pulse}<span class="pin-head"><span class="pin-emoji">${sportById(sportID)?.emoji ?? '🏃'}</span></span>${live}${more}`
+  button.innerHTML = `${pulse}<span class="pin-head"><span class="pin-art">${sportIllustrationMarkup(sportID)}</span></span>${live}${more}`
 
   root.querySelector('.pin-label')?.remove()
   if (pin.isMe) {
@@ -128,7 +129,7 @@ function renderCluster(root: HTMLElement, cluster: Extract<MapMarker, { kind: 'c
   button.dataset.dim = String(!cluster.hasActive)
   const categoryLabel = CATEGORY_LABELS[cluster.category].toLowerCase()
   button.setAttribute('aria-label', `${cluster.count} pratiquants de ${categoryLabel} rassemblés ici : toucher pour zoomer et les séparer`)
-  button.innerHTML = `<span class="pin-head"><span class="pin-emoji">${CATEGORY_EMOJI[cluster.category]}</span></span><span class="pin-count">${cluster.count}</span>`
+  button.innerHTML = `<span class="pin-head"><span class="pin-art">${categoryIllustrationMarkup(cluster.category)}</span></span><span class="pin-count">${cluster.count}</span>`
   root.querySelector('.pin-label')?.remove()
 }
 

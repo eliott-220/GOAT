@@ -91,6 +91,7 @@ export function AuthScreen() {
     return (
       <ProfileWizard
         initial={draft}
+        externalError={authError}
         progress={{ first: 2, total: SIGN_UP_STEPS }}
         onBack={(current) => {
           setDraft(current)
@@ -98,11 +99,11 @@ export function AuthScreen() {
         }}
         finish={{ allow: 'Autoriser et créer mon compte', skip: 'Créer mon compte, localisation plus tard' }}
         onFinish={async (details, requestLocation) => {
+          setDraft({ firstName: details.firstName, ageText: String(details.age), athleteStyle: details.athleteStyle, sports: details.sports })
           if (requestLocation) await app.location.requestPermission()
           await app.signUp({ email: email.trim(), password, firstName: details.firstName }, details)
-          // Si on est encore là, le compte n'a pas été ouvert (email déjà pris, réseau…) : retour à l'étape « Compte »,
-          // où l'erreur s'affiche. En cas de succès, l'écran est remplacé par l'app.
-          setStage('account')
+          // En cas d'erreur, garder les sports et le profil saisis pour permettre une nouvelle tentative.
+          // Un compte créé avec confirmation d'email affiche son écran dédié via authNotice.
         }}
       />
     )

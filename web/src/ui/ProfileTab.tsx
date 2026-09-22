@@ -3,15 +3,16 @@ import { athleteStyleById } from '../core/athleteStyles'
 import { DEMO_HUBS } from '../core/demo'
 import { LINGER_OPTIONS, VISIBILITY_LABELS, primarySportID, sessionDuration, type VisibilityScope } from '../core/models'
 import { ageProblem, parseAge } from '../core/profileRules'
-import { sportById, sportColor, sportName } from '../core/sports'
+import { sportById, sportName } from '../core/sports'
 import { sessionsPerSport, summarizeActivity } from '../core/stats'
 import { refreshApp } from '../pwa'
 import { useApp, useNow } from '../state/context'
 import { Avatar, Panel, SportHexes, Switch } from './common'
 import { formatDayTime, formatDuration, formatMonthYearShort, formatPractice, formatRelative } from './format'
 import { Icon, type IconName } from './Icon'
-import { AthleteStylePicker } from './ProfileFields'
+import { AthleteStylePicker, STYLE_ICONS } from './ProfileFields'
 import { SportSelection } from './SportSelection'
+import { SportIllustration } from './SportIllustration'
 
 const BIO_LIMIT = 140
 const APP_VERSION = '0.1'
@@ -122,12 +123,12 @@ function ProfileMain({ onNavigate }: { onNavigate: (view: View) => void }) {
           <div className="pills">
             {style && (
               <span className="pill">
-                <span aria-hidden="true">{style.emoji}</span> {style.name}
+                <Icon name={STYLE_ICONS[style.id]} size={16} /> {style.name}
               </span>
             )}
             {primary && (
               <span className="pill">
-                <span aria-hidden="true">{primary.emoji}</span> {primary.name}
+                <SportIllustration sportID={primary.id} className="sport-art-inline" /> {primary.name}
               </span>
             )}
           </div>
@@ -183,9 +184,7 @@ function ProfileMain({ onNavigate }: { onNavigate: (view: View) => void }) {
         {finished.length === 0 && <p className="row-empty">Tes sessions terminées apparaîtront ici.</p>}
         {visibleActivity.map((session) => (
           <div className="activity-row" key={session.id}>
-            <span className="sport-emoji" style={{ background: `${sportColor(session.sportID)}26` }} aria-hidden="true">
-              {sportById(session.sportID)?.emoji}
-            </span>
+            <SportIllustration sportID={session.sportID} />
             <span className="activity-text">
               {sportName(session.sportID)}
               <small>

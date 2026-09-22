@@ -1,5 +1,10 @@
 import { ATHLETE_STYLES } from '../core/athleteStyles'
 import type { AthleteStyleID } from '../core/models'
+import { Icon, type IconName } from './Icon'
+
+export const STYLE_ICONS: Record<AthleteStyleID, IconName> = {
+  adventurer: 'mountain', competitor: 'trophy', fun: 'star', team: 'people', wellbeing: 'activity', regular: 'clock',
+}
 
 /** Grille de badges « style de sportif » : un seul choix. Utilisée à l'inscription et dans le profil. */
 export function AthleteStylePicker({ value, onChange }: { value?: AthleteStyleID; onChange: (id: AthleteStyleID) => void }) {
@@ -15,7 +20,7 @@ export function AthleteStylePicker({ value, onChange }: { value?: AthleteStyleID
           onClick={() => onChange(style.id)}
         >
           <span className="style-emoji" aria-hidden="true">
-            {style.emoji}
+            <Icon name={STYLE_ICONS[style.id]} size={25} />
           </span>
           <span className="style-name">{style.name}</span>
           <span className="style-tagline">{style.tagline}</span>

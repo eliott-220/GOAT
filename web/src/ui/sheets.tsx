@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from 'react'
 import { sessionDuration, type MiniProfile } from '../core/models'
-import { sportById, sportColor, sportName } from '../core/sports'
+import { sportById, sportName } from '../core/sports'
 import { useApp, useNow } from '../state/context'
 import { Avatar, Panel, Sheet, SportHexes, Switch } from './common'
 import { formatMonthYearShort, formatTimer } from './format'
 import { Icon } from './Icon'
+import { SportIllustration } from './SportIllustration'
 
 export function StartSessionSheet({ onClose }: { onClose: () => void }) {
   const { app, snap } = useApp()
@@ -32,9 +33,7 @@ export function StartSessionSheet({ onClose }: { onClose: () => void }) {
                 onClose()
               }}
             >
-              <span className="sport-emoji" style={{ background: `${sportColor(sportID)}26` }} aria-hidden="true">
-                {sport.emoji}
-              </span>
+              <SportIllustration sportID={sportID} />
               <span className="row-title">{sport.name}</span>
               {isPrimary && <span className="primary-star" aria-label="Sport principal"><Icon name="star" size={16} filled /></span>}
               <span className="spacer" />
@@ -68,9 +67,7 @@ export function SessionSheet({ onClose }: { onClose: () => void }) {
           <Panel title="En cours" count={snap.mySessions.length}>
             {snap.mySessions.map((session) => (
               <div className="row" key={session.id}>
-                <span className="sport-emoji" style={{ background: `${sportColor(session.sportID)}26` }} aria-hidden="true">
-                  {sportById(session.sportID)?.emoji}
-                </span>
+                <SportIllustration sportID={session.sportID} />
                 <div className="row-main">
                   <div className="row-title">{sportName(session.sportID)}</div>
                   <div className="row-sub tabular">{formatTimer(sessionDuration(session, now))}</div>

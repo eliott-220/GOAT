@@ -9,27 +9,27 @@
   color-scheme: dark;
 
   /* Surfaces */
-  --bg: #090c11;
-  --surface: #10151c;
-  --surface-2: #171d26;
-  --surface-3: #202835;
-  --input-bg: #121821;
-  --line: rgba(255, 255, 255, 0.07);
-  --line-strong: rgba(255, 255, 255, 0.13);
+  --bg: #080a0b;
+  --surface: #15191b;
+  --surface-2: #1b2022;
+  --surface-3: #293033;
+  --input-bg: #171c1e;
+  --line: rgba(255, 255, 255, 0.085);
+  --line-strong: rgba(255, 255, 255, 0.16);
 
   /* Texte */
   --text: #ffffff;
-  --text-2: #c9cfd8;
-  --muted: #8b94a3;
+  --text-2: #c9cdd0;
+  --muted: #949da2;
 
   /* Marque et sémantique */
-  --gold: #f6b300;
-  --gold-light: #ffcf4a;
+  --gold: #f5bd31;
+  --gold-light: #ffdb73;
   --gold-ink: #1a1300;
-  --gold-grad: linear-gradient(180deg, #ffcf4a 0%, #f5b000 100%);
+  --gold-grad: linear-gradient(145deg, #ffdb73 0%, #f2b526 100%);
   --accent: var(--gold);
   --blue: #3b9bff;
-  --green: #34d05c;
+  --green: #69cf56;
   --red: #ff453a;
   --purple: #a970ff;
   --orange: #ff8f2a;
@@ -40,7 +40,7 @@
   --radius: 16px;
   --radius-sm: 12px;
   --shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-  --glass: rgba(13, 17, 23, 0.86);
+  --glass: rgba(18, 22, 23, 0.91);
 
   --font: 'Plus Jakarta Sans Variable', -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
 }
@@ -1033,6 +1033,30 @@ textarea.input {
   font-weight: 800;
 }
 
+.map-presence {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: calc(100% - 64px);
+  margin-top: 4px;
+  padding: 7px 11px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+  background: rgba(13, 18, 24, 0.9);
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.2);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.map-presence .live-dot {
+  width: 7px;
+  height: 7px;
+}
+
 /* Sélecteur à segments (feuilles, fond opaque) : bascule entre plusieurs vues, ex. Abonnements/Abonnés/Découvrir.
    Distinct de .chip (verre dépoli pensé pour flotter sur la carte, hors de propos sur un fond de carte plein). */
 .segmented {
@@ -1147,6 +1171,22 @@ textarea.input {
 
 .dock-row .btn {
   flex: none;
+}
+
+@media (max-width: 420px) {
+  .map-tab {
+    --dock-h: 172px;
+  }
+
+  .dock-row {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .dock-row .btn {
+    width: 100%;
+  }
 }
 
 .dock-title {
@@ -2058,7 +2098,7 @@ textarea.input {
 .auth .onboarding-body {
   justify-content: flex-start;
   overflow-y: auto;
-  gap: 14px;
+  gap: 12px;
   padding-top: 8px;
 }
 
@@ -2068,7 +2108,30 @@ textarea.input {
 }
 
 .auth .logo {
-  margin: 4px 0 6px;
+  align-self: flex-start;
+  flex-direction: row;
+  gap: 10px;
+  margin: 0 0 4px;
+}
+
+.auth .logo svg {
+  width: 34px;
+  height: 34px;
+}
+
+.auth .logo-word {
+  font-size: 24px;
+}
+
+.auth .logo-sub {
+  gap: 0;
+  font-size: 9px;
+  letter-spacing: 0.14em;
+}
+
+.auth .logo-sub::before,
+.auth .logo-sub::after {
+  display: none;
 }
 
 /* Barres de défilement internes masquées (le défilement reste possible) : look d'application. */
@@ -2247,6 +2310,360 @@ textarea.input {
 
 .style-panel .style-card[aria-checked='true'] {
   background: color-mix(in srgb, var(--gold) 11%, var(--surface-2));
+}
+
+/* ───────── Direction visuelle GOAT : pictogrammes sportifs et cartes éditoriales ───────── */
+
+.sport-art {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 38px;
+  height: 38px;
+  border: 1px solid color-mix(in srgb, var(--sport-color) 30%, transparent);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--sport-color) 13%, #101517);
+  color: color-mix(in srgb, var(--sport-color) 75%, white);
+  line-height: 1;
+}
+
+.sport-art svg {
+  display: block;
+  width: 27px;
+  height: 27px;
+}
+
+.sport-art-inline {
+  width: 19px;
+  height: 19px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  vertical-align: middle;
+}
+
+.sport-art-inline svg {
+  width: 18px;
+  height: 18px;
+}
+
+.sport-art-hex {
+  width: 46px;
+  height: 46px;
+  border: 0;
+  background: transparent;
+  color: var(--hex);
+}
+
+.sport-art-hex svg {
+  position: static;
+  width: 41px;
+  height: 41px;
+}
+
+.chip .sport-art-inline {
+  color: var(--sport-color);
+}
+
+.chip[aria-pressed='true'] .sport-art-inline {
+  color: var(--gold-ink);
+}
+
+.dock-live .sport-art {
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
+}
+
+.dock-live .sport-art svg {
+  width: 32px;
+  height: 32px;
+}
+
+.pin-art,
+.pin-art svg {
+  display: block;
+  width: 27px;
+  height: 27px;
+}
+
+.pin-art {
+  color: #fff;
+}
+
+.pin[data-me='true'] .pin-art {
+  color: #231b08;
+}
+
+.pin-cluster .pin-art,
+.pin-cluster .pin-art svg {
+  width: 32px;
+  height: 32px;
+}
+
+.style-emoji {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  margin-bottom: 3px;
+  border: 1px solid rgba(245, 189, 49, 0.28);
+  border-radius: 11px;
+  background: rgba(245, 189, 49, 0.08);
+  color: var(--gold);
+}
+
+.card {
+  border-color: rgba(255, 255, 255, 0.085);
+  background: linear-gradient(155deg, #1a1e20, #141819);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.14);
+}
+
+.tabbar {
+  background: linear-gradient(180deg, #161a1b, #101314);
+  border-top-color: rgba(255, 255, 255, 0.12);
+  border-radius: 22px 22px 0 0;
+}
+
+.tab[aria-selected='true'] svg {
+  filter: none;
+}
+
+.tab[aria-selected='true']::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  width: 28px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--gold);
+}
+
+.page-head h1 {
+  font-size: 29px;
+  letter-spacing: -0.035em;
+}
+
+.page-intro {
+  margin: 0 20px 21px;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.editorial-page {
+  padding-bottom: 20px;
+}
+
+.feed-filters {
+  display: flex;
+  gap: 8px;
+  padding: 0 16px 10px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.feed-filters::-webkit-scrollbar {
+  display: none;
+}
+
+.feed-filter {
+  flex: none;
+  padding: 9px 15px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text-2);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.feed-filter[aria-pressed='true'] {
+  border-color: var(--gold);
+  background: rgba(245, 189, 49, 0.09);
+  color: var(--gold-light);
+}
+
+.feed-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 14px 20px 10px;
+  color: var(--text-2);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.feed-heading small {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.feed-list {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  padding: 0 14px;
+}
+
+.feed-card {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr);
+  gap: 12px;
+  padding: 16px 15px;
+  border: 1px solid var(--line);
+  border-radius: 15px;
+  background: linear-gradient(140deg, #1a1e20, #121617);
+}
+
+.feed-card-icon {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border: 1px solid color-mix(in srgb, currentColor 24%, transparent);
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.19);
+}
+
+.feed-card.tone-gold .feed-card-icon,
+.feed-card.tone-gold .feed-card-meta strong { color: var(--gold); }
+.feed-card.tone-green .feed-card-icon,
+.feed-card.tone-green .feed-card-meta strong { color: var(--green); }
+.feed-card.tone-purple .feed-card-icon,
+.feed-card.tone-purple .feed-card-meta strong { color: var(--purple); }
+.feed-card.tone-blue .feed-card-icon,
+.feed-card.tone-blue .feed-card-meta strong { color: var(--blue); }
+
+.feed-card-content {
+  min-width: 0;
+}
+
+.feed-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0 0 7px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.feed-card-meta strong {
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.feed-card h2 {
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 750;
+  line-height: 1.35;
+  letter-spacing: -0.015em;
+}
+
+.feed-card p {
+  margin-top: 5px;
+  color: var(--text-2);
+  font-size: 13px;
+}
+
+.feed-card-sport {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 12px;
+  padding: 5px 9px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--text-2);
+  font-size: 12px;
+}
+
+.feed-empty {
+  margin: 8px 14px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface);
+}
+
+.alliance-actions {
+  padding: 0 14px 7px;
+}
+
+.alliance-action {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  width: 100%;
+  padding: 15px;
+  border: 1px solid rgba(245, 189, 49, 0.32);
+  border-radius: 15px;
+  background: linear-gradient(125deg, rgba(245, 189, 49, 0.12), rgba(245, 189, 49, 0.025));
+  color: var(--text);
+  text-align: left;
+}
+
+.alliance-action > span:nth-child(2) {
+  flex: 1;
+  font-size: 14px;
+  font-weight: 750;
+}
+
+.alliance-action small {
+  display: block;
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.alliance-action-icon {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
+  background: rgba(245, 189, 49, 0.12);
+  color: var(--gold);
+}
+
+.allies-card .row {
+  min-height: 66px;
+}
+
+.allies-card .avatar {
+  border: 1px solid rgba(245, 189, 49, 0.6);
+}
+
+.suggestion-row .person {
+  min-width: 0;
+}
+
+.suggestion-row .btn {
+  flex: none;
+}
+
+.suggestion-sport {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 27px;
+  height: 27px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.tribu-icon {
+  color: var(--gold);
+}
+
+@media (max-width: 370px) {
+  .feed-card { grid-template-columns: 42px minmax(0, 1fr); gap: 9px; padding: 13px; }
+  .feed-card-icon { width: 40px; height: 40px; }
+  .suggestion-sport { display: none; }
 }
 
 .card-hint {
