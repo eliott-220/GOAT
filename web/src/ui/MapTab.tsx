@@ -32,7 +32,6 @@ export function MapTab({ active, onOpenProfile }: { active: boolean; onOpenProfi
     if (sportFilter) present.add(sportFilter)
     return SPORTS.filter((sport) => present.has(sport.id))
   }, [snap.pins, snap.me?.sports, sportFilter])
-  const activeNow = useMemo(() => pins.filter((pin) => pin.status === 'active' && !pin.isMe).length, [pins])
   const invisible = snap.me?.visibility.isInvisible === true
   const first = snap.mySessions[0]
 
@@ -122,16 +121,6 @@ export function MapTab({ active, onOpenProfile }: { active: boolean; onOpenProfi
         <button className="map-btn" aria-label="Me localiser" onClick={() => void locateMe()}>
           <Icon name="locate" size={23} />
         </button>
-      </div>
-
-      <div className="live-card" aria-live="polite">
-        <span className="live-card-label">
-          <span className="live-dot" /> En direct
-        </span>
-        <span className="live-card-count">
-          {activeNow === 0 ? 'Aucun sportif actif' : `${activeNow} sportif${activeNow > 1 ? 's' : ''} actif${activeNow > 1 ? 's' : ''}`}
-        </span>
-        <span className="live-card-sub">{sportFilter ? sportName(sportFilter) : 'sur toute la carte'}</span>
       </div>
 
       <div className="dock">

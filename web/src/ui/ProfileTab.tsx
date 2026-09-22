@@ -5,6 +5,7 @@ import { LINGER_OPTIONS, VISIBILITY_LABELS, primarySportID, sessionDuration, typ
 import { ageProblem, parseAge } from '../core/profileRules'
 import { sportById, sportColor, sportName } from '../core/sports'
 import { sessionsPerSport, summarizeActivity } from '../core/stats'
+import { refreshApp } from '../pwa'
 import { useApp, useNow } from '../state/context'
 import { Avatar, Panel, SportHexes, Switch } from './common'
 import { formatDayTime, formatDuration, formatMonthYearShort, formatPractice, formatRelative } from './format'
@@ -13,10 +14,11 @@ import { AthleteStylePicker } from './ProfileFields'
 import { SportSelection } from './SportSelection'
 
 const BIO_LIMIT = 140
+const APP_VERSION = '0.1'
 
 const ageToText = (age?: number): string => (age === undefined ? '' : String(age))
 
-type View = 'main' | 'sports' | 'visibility'
+type View = 'main' | 'sports' | 'visibility' | 'settings'
 
 /** Réduit une photo à `maxPixel` px de côté max et l'encode en JPEG (photo de profil légère). */
 async function toAvatarDataURL(file: File, maxPixel = 400): Promise<string> {
@@ -46,6 +48,7 @@ export function ProfileTab() {
 
   if (view === 'sports') return <SubPage title="Mes sports" onBack={() => setView('main')}><SportsEditor /></SubPage>
   if (view === 'visibility') return <SubPage title="Visibilité" onBack={() => setView('main')}><VisibilitySettings /></SubPage>
+  if (view === 'settings') return <SubPage title="Paramètres" onBack={() => setView('main')}><SettingsPage onNavigate={setView} /></SubPage>
   return <ProfileMain onNavigate={setView} />
 }
 
@@ -84,53 +87,12 @@ function ProfileMain({ onNavigate }: { onNavigate: (view: View) => void }) {
   const { app, snap } = useApp()
   const me = snap.me!
   const now = useNow(60_000)
-  const [name, setName] = useState(me.firstName)
-  const [bio, setBio] = useState(me.bio)
-  const [ageText, setAgeText] = useState(ageToText(me.age))
-  const [confirmDelete, setConfirmDelete] = useState(false)
   const [showAllActivity, setShowAllActivity] = useState(false)
-  const fileInput = useRef<HTMLInputElement>(null)
-
-  // Recale les champs si le profil change ailleurs (ex. autre onglet).
-  useEffect(() => {
-    setName(me.firstName)
-    setBio(me.bio)
-  }, [me.firstName, me.bio])
-  useEffect(() => {
-    setAgeText(ageToText(me.age))
-  }, [me.age])
 
   // Les chiffres du profil se déduisent des sessions (en cours et terminées) : rien n'est stocké en plus.
   const sessions = useMemo(() => [...snap.mySessions, ...snap.history], [snap.mySessions, snap.history])
   const summary = useMemo(() => summarizeActivity(sessions, now), [sessions, now])
   const perSport = useMemo(() => sessionsPerSport(sessions), [sessions])
-
-  function commit() {
-    const newName = name.trim() || me.firstName
-    if (!name.trim()) setName(me.firstName)
-    if (newName !== me.firstName || bio !== me.bio) app.updateProfile((user) => ({ ...user, firstName: newName, bio }))
-  }
-
-  function commitAge() {
-    const age = parseAge(ageText)
-    const problem = ageProblem(age)
-    if (problem) {
-      app.setError(problem)
-      setAgeText(ageToText(me.age))
-      return
-    }
-    if (age !== me.age) app.updateProfile((user) => ({ ...user, age }))
-  }
-
-  async function onPhoto(file?: File) {
-    if (!file) return
-    try {
-      const photoData = await toAvatarDataURL(file)
-      app.updateProfile((user) => ({ ...user, photoData }))
-    } catch {
-      app.setError('Impossible de charger cette photo.')
-    }
-  }
 
   const style = athleteStyleById(me.athleteStyle)
   const primaryID = primarySportID(me)
@@ -154,27 +116,9 @@ function ProfileMain({ onNavigate }: { onNavigate: (view: View) => void }) {
   return (
     <>
       <header className="profile-head">
-        <button className="avatar-button" aria-label="Changer la photo de profil" onClick={() => fileInput.current?.click()}>
-          <Avatar name={me.firstName} photo={me.photoData} size={96} ring />
-          <span className="avatar-badge"><Icon name="camera" size={15} /></span>
-        </button>
-        <input ref={fileInput} type="file" accept="image/*" hidden onChange={(e) => void onPhoto(e.target.files?.[0])} />
-
+        <Avatar name={me.firstName} photo={me.photoData} size={80} ring />
         <div className="profile-id">
-          <div className="name-field">
-            {/* Le champ s'ajuste à son texte (le crayon reste collé au prénom) : le texte caché en double donne la largeur. */}
-            <span className="name-sizer" data-value={name}>
-              <input
-                className="name-input"
-                aria-label="Prénom"
-                value={name}
-                maxLength={30}
-                onChange={(e) => setName(e.target.value)}
-                onBlur={commit}
-              />
-            </span>
-            <Icon name="pencil" size={16} />
-          </div>
+          <h1 className="profile-name">{me.firstName}</h1>
           <div className="pills">
             {style && (
               <span className="pill">
@@ -189,6 +133,9 @@ function ProfileMain({ onNavigate }: { onNavigate: (view: View) => void }) {
           </div>
           <p className="member-since">Membre depuis {formatMonthYearShort(me.joinedAt)}</p>
         </div>
+        <button className="icon-btn big" aria-label="Paramètres" onClick={() => onNavigate('settings')}>
+          <Icon name="settings" size={20} />
+        </button>
       </header>
 
       <div className="stats">
@@ -202,7 +149,7 @@ function ProfileMain({ onNavigate }: { onNavigate: (view: View) => void }) {
         <div className="summary">
           <SummaryItem icon="activity" tone="blue" value={String(summary.sessionsThisWeek)} label="Sessions cette semaine" />
           <SummaryItem icon="clock" tone="green" value={formatPractice(summary.timeThisWeek)} label="De pratique cette semaine" />
-          <SummaryItem icon="calendar" tone="gold" value={String(summary.activeDays30)} label="Jours actifs (30 j)" />
+          <SummaryItem icon="calendar" tone="gold" value={String(summary.activeDays30)} label="Jours actifs (30 j)" />
           <SummaryItem icon="trophy" tone="purple" value={favorite?.name ?? '—'} small label="Sport favori" />
         </div>
       </Panel>
@@ -249,73 +196,6 @@ function ProfileMain({ onNavigate }: { onNavigate: (view: View) => void }) {
           </div>
         ))}
       </Panel>
-
-      <Panel title="À propos de moi">
-        <textarea
-          className="input bio-input"
-          aria-label="Bio courte"
-          placeholder="Bio courte"
-          rows={2}
-          value={bio}
-          maxLength={BIO_LIMIT}
-          onChange={(e) => setBio(e.target.value)}
-          onBlur={commit}
-        />
-        <div className="counter">{bio.length}/{BIO_LIMIT}</div>
-        <div className="row">
-          <label className="row-title" htmlFor="profile-age">
-            Âge
-          </label>
-          <span className="spacer" />
-          <input
-            id="profile-age"
-            className="input age-input"
-            inputMode="numeric"
-            pattern="[0-9]*"
-            maxLength={3}
-            value={ageText}
-            onChange={(e) => setAgeText(e.target.value)}
-            onBlur={commitAge}
-          />
-        </div>
-        <p className="hint card-hint">Ton âge n'est jamais montré aux autres.</p>
-      </Panel>
-
-      <Panel title="Réglages">
-        <button className="row row-button" onClick={() => onNavigate('visibility')}>
-          <Icon name={me.visibility.isInvisible ? 'eyeOff' : 'eye'} size={20} />
-          <span className="row-title">Visibilité</span>
-          <span className="spacer" />
-          <span className="row-note">{me.visibility.isInvisible ? 'Invisible' : 'Visible'}</span>
-          <Icon name="chevronRight" size={18} />
-        </button>
-      </Panel>
-
-      {app.supportsDemoTools && <DemoTools />}
-
-      {snap.hasAccounts ? (
-        <AccountSection />
-      ) : (
-        <div className="card spaced">
-          {confirmDelete ? (
-            <>
-              <div className="row">
-                <div>
-                  <strong>Supprimer ton profil sur cet appareil ?</strong>
-                  <div className="row-sub wrap">Tes sessions en cours sont arrêtées et tu repasses par l'onboarding.</div>
-                </div>
-              </div>
-              <button className="row row-button danger-text" onClick={() => void app.deleteLocalProfile()}>Supprimer</button>
-              <button className="row row-button muted" onClick={() => setConfirmDelete(false)}>Annuler</button>
-            </>
-          ) : (
-            <button className="row row-button danger-text" onClick={() => setConfirmDelete(true)}>Supprimer mon profil local</button>
-          )}
-        </div>
-      )}
-      <p className="footnote version">
-        GOAT Métavers · version web 0.1 · {snap.hasAccounts ? 'compte réel, présence simulée' : 'données de démonstration'}
-      </p>
     </>
   )
 }
@@ -340,6 +220,158 @@ function SummaryItem({ icon, tone, value, label, small = false }: { icon: IconNa
       <b className={small ? 'small' : undefined}>{value}</b>
       <span>{label}</span>
     </div>
+  )
+}
+
+/** Paramètres : modifier ses informations, visibilité, mises à jour de l'app, outils de démo, compte. */
+function SettingsPage({ onNavigate }: { onNavigate: (view: View) => void }) {
+  const { app, snap } = useApp()
+  const me = snap.me!
+
+  return (
+    <>
+      <ProfileInformation />
+
+      <Panel title="Confidentialité">
+        <button className="row row-button" onClick={() => onNavigate('visibility')}>
+          <Icon name={me.visibility.isInvisible ? 'eyeOff' : 'eye'} size={20} />
+          <span className="row-title">Visibilité</span>
+          <span className="spacer" />
+          <span className="row-note">{me.visibility.isInvisible ? 'Invisible' : 'Visible'}</span>
+          <Icon name="chevronRight" size={18} />
+        </button>
+      </Panel>
+
+      <UpdatesSection />
+
+      {app.supportsDemoTools && <DemoTools />}
+
+      {snap.hasAccounts ? <AccountSection /> : <LocalProfileSection />}
+
+      <p className="footnote version">
+        GOAT Métavers · version web {APP_VERSION} · {snap.hasAccounts ? 'compte réel, présence simulée' : 'données de démonstration'}
+      </p>
+    </>
+  )
+}
+
+/** Prénom, photo, bio, âge : les seules informations du profil qui se modifient (les sports et le style ont leurs
+ * propres écrans, restés accessibles directement depuis le profil principal). */
+function ProfileInformation() {
+  const { app, snap } = useApp()
+  const me = snap.me!
+  const [name, setName] = useState(me.firstName)
+  const [bio, setBio] = useState(me.bio)
+  const [ageText, setAgeText] = useState(ageToText(me.age))
+  const fileInput = useRef<HTMLInputElement>(null)
+
+  // Recale les champs si le profil change ailleurs (ex. reconnexion).
+  useEffect(() => {
+    setName(me.firstName)
+    setBio(me.bio)
+  }, [me.firstName, me.bio])
+  useEffect(() => {
+    setAgeText(ageToText(me.age))
+  }, [me.age])
+
+  function commit() {
+    const newName = name.trim() || me.firstName
+    if (!name.trim()) setName(me.firstName)
+    if (newName !== me.firstName || bio !== me.bio) app.updateProfile((user) => ({ ...user, firstName: newName, bio }))
+  }
+
+  function commitAge() {
+    const age = parseAge(ageText)
+    const problem = ageProblem(age)
+    if (problem) {
+      app.setError(problem)
+      setAgeText(ageToText(me.age))
+      return
+    }
+    if (age !== me.age) app.updateProfile((user) => ({ ...user, age }))
+  }
+
+  async function onPhoto(file?: File) {
+    if (!file) return
+    try {
+      const photoData = await toAvatarDataURL(file)
+      app.updateProfile((user) => ({ ...user, photoData }))
+    } catch {
+      app.setError('Impossible de charger cette photo.')
+    }
+  }
+
+  return (
+    <Panel title="Informations">
+      <div className="settings-avatar">
+        <button className="avatar-button" aria-label="Changer la photo de profil" onClick={() => fileInput.current?.click()}>
+          <Avatar name={me.firstName} photo={me.photoData} size={72} ring />
+          <span className="avatar-badge"><Icon name="camera" size={14} /></span>
+        </button>
+        <input ref={fileInput} type="file" accept="image/*" hidden onChange={(e) => void onPhoto(e.target.files?.[0])} />
+      </div>
+
+      <div className="field settings-field">
+        <label htmlFor="settings-name">Prénom</label>
+        <input id="settings-name" className="input" value={name} maxLength={30} onChange={(e) => setName(e.target.value)} onBlur={commit} />
+      </div>
+
+      <div className="field settings-field">
+        <label htmlFor="settings-bio">Bio courte</label>
+        <textarea
+          id="settings-bio"
+          className="input"
+          placeholder="Bio courte"
+          rows={2}
+          value={bio}
+          maxLength={BIO_LIMIT}
+          onChange={(e) => setBio(e.target.value)}
+          onBlur={commit}
+        />
+        <div className="settings-counter">{bio.length}/{BIO_LIMIT}</div>
+      </div>
+
+      <div className="field settings-field">
+        <label htmlFor="settings-age">Âge</label>
+        <input
+          id="settings-age"
+          className="input"
+          inputMode="numeric"
+          pattern="[0-9]*"
+          maxLength={3}
+          value={ageText}
+          onChange={(e) => setAgeText(e.target.value)}
+          onBlur={commitAge}
+        />
+        <p className="hint">Ton âge n'est jamais montré aux autres.</p>
+      </div>
+    </Panel>
+  )
+}
+
+/** Rafraîchit l'app (vide le cache local et vérifie une nouvelle version) : utile après une mise à jour du site,
+ * surtout installée en PWA où le service worker peut mettre un moment à la servir de lui-même. */
+function UpdatesSection() {
+  const [busy, setBusy] = useState(false)
+
+  return (
+    <Panel title="Mises à jour">
+      <button
+        className="row row-button"
+        disabled={busy}
+        onClick={() => {
+          setBusy(true)
+          void refreshApp() // recharge la page en cas de succès : pas besoin de repasser busy à faux
+        }}
+      >
+        <Icon name="refresh" size={20} />
+        <span className="row-main">
+          <span className="row-title">Rafraîchir l'application</span>
+          <span className="row-sub wrap">Télécharge la dernière version du site si une mise à jour est disponible.</span>
+        </span>
+        {busy && <span className="spinner" aria-label="Rafraîchissement" />}
+      </button>
+    </Panel>
   )
 }
 
@@ -442,6 +474,7 @@ function AccountSection() {
           </span>
         </div>
         <button className="row row-button" disabled={busy} onClick={() => void app.signOut()}>
+          <Icon name="logout" size={20} />
           <span className="row-title">Se déconnecter</span>
         </button>
       </Panel>
@@ -473,5 +506,33 @@ function AccountSection() {
         )}
       </div>
     </>
+  )
+}
+
+/** Mode démo (sans compte) : suppression du profil local, équivalent au « Compte » des vrais comptes. */
+function LocalProfileSection() {
+  const { app } = useApp()
+  const [confirmDelete, setConfirmDelete] = useState(false)
+
+  return (
+    <div className="card spaced">
+      {confirmDelete ? (
+        <>
+          <div className="row">
+            <div>
+              <strong>Supprimer ton profil sur cet appareil ?</strong>
+              <div className="row-sub wrap">Tes sessions en cours sont arrêtées et tu repasses par l'onboarding.</div>
+            </div>
+          </div>
+          <button className="row row-button danger-text" onClick={() => void app.deleteLocalProfile()}>Supprimer</button>
+          <button className="row row-button muted" onClick={() => setConfirmDelete(false)}>Annuler</button>
+        </>
+      ) : (
+        <button className="row row-button danger-text" onClick={() => setConfirmDelete(true)}>
+          <Icon name="logout" size={20} />
+          Supprimer mon profil local
+        </button>
+      )}
+    </div>
   )
 }

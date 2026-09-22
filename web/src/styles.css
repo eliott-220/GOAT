@@ -1054,43 +1054,6 @@ textarea.input {
   transition: transform 0.12s linear;
 }
 
-/* Compteur « en direct », au-dessus du panneau de session (comme la fiche de piste de la maquette). */
-.live-card {
-  position: absolute;
-  z-index: 4;
-  right: 14px;
-  bottom: calc(var(--dock-h) + 12px);
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 11px 15px 12px;
-  border: 1px solid var(--line-strong);
-  border-radius: 14px;
-  background: rgba(13, 17, 23, 0.94);
-  box-shadow: var(--shadow);
-}
-
-.live-card-label {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--text-2);
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
-.live-card-count {
-  font-size: 15px;
-  font-weight: 800;
-}
-
-.live-card-sub {
-  color: var(--muted);
-  font-size: 12px;
-}
-
 /* Panneau du bas : comme la « bourse des pistes » de la maquette, mais pour la session de sport. */
 .dock {
   position: absolute;
@@ -1330,6 +1293,41 @@ textarea.input {
   color: #fff;
   font-size: 9px;
   font-weight: 800;
+}
+
+/* Groupe de pins rassemblés (dézoomé, voir core/clustering.ts) : même forme que le pin, une tête plus large et un
+   badge qui affiche le nombre de pratiquants au lieu du simple point « en direct ». */
+.pin-cluster {
+  width: 48px;
+  height: 56px;
+}
+
+.pin-cluster .pin-head {
+  width: 46px;
+  height: 46px;
+  font-size: 21px;
+}
+
+.pin-count {
+  position: absolute;
+  top: -5px;
+  right: -6px;
+  min-width: 21px;
+  height: 21px;
+  padding: 0 5px;
+  display: grid;
+  place-items: center;
+  border: 2px solid #fff;
+  border-radius: 999px;
+  background: var(--green);
+  color: #06210f;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.pin-cluster[data-dim='true'] .pin-count {
+  background: #9aa3b0;
 }
 
 /* Étiquette de mon propre pin : même style que « NOUVEAU RECORD » sur la maquette. */
@@ -1611,50 +1609,15 @@ textarea.input {
   min-width: 0;
 }
 
-.name-field {
-  display: flex;
-  align-items: center;
-  align-self: stretch;
-  gap: 8px;
-  color: var(--muted);
-}
-
-/* Champ qui s'ajuste à son texte (le crayon reste collé au prénom) : le texte caché en double lui donne sa largeur. */
-.name-sizer {
-  display: inline-grid;
-  grid-template-columns: minmax(0, 1fr); /* la colonne ne dépasse jamais l'espace disponible : un long prénom défile dans le champ */
-  min-width: 48px;
-  max-width: calc(100% - 26px);
+/* Prénom affiché en lecture seule (se modifie depuis Paramètres → Informations, voir .settings-field). */
+.profile-name {
+  max-width: 100%;
+  overflow: hidden;
   font-size: 27px;
   font-weight: 800;
   letter-spacing: -0.02em;
-}
-
-.name-sizer::after {
-  content: attr(data-value) ' ';
-  grid-area: 1 / 1;
-  padding: 2px 0;
-  visibility: hidden;
-  white-space: pre;
-}
-
-.name-input {
-  grid-area: 1 / 1;
-  width: 0; /* sa largeur « naturelle » (20 caractères) ne doit pas compter : seul le texte caché donne la taille */
-  min-width: 100%;
-  padding: 2px 0;
-  border: 0;
-  border-bottom: 1px solid transparent;
-  border-radius: 0;
-  background: transparent;
-  color: var(--text);
-  font: inherit;
-  outline: none;
   text-overflow: ellipsis;
-}
-
-.name-input:focus {
-  border-bottom-color: var(--gold);
+  white-space: nowrap;
 }
 
 .pills {
@@ -1872,13 +1835,28 @@ textarea.input {
   white-space: nowrap;
 }
 
-.bio-input {
-  margin: 4px 16px 0;
-  width: calc(100% - 32px);
+/* Formulaire "Informations" (Paramètres) : l'avatar centré, puis des champs qui portent eux-mêmes leur gouttière
+   (les cartes n'ont pas de padding interne, voir .card). */
+.settings-avatar {
+  display: flex;
+  justify-content: center;
+  padding: 14px 0 6px;
 }
 
-.counter {
-  margin: 4px 18px 12px;
+/* L'avatar y est plus petit que sur le profil : le badge photo suit. */
+.settings-avatar .avatar-badge {
+  right: -2px;
+  bottom: -2px;
+  width: 26px;
+  height: 26px;
+  border-color: var(--surface);
+}
+
+.settings-field {
+  margin: 0 16px 16px;
+}
+
+.settings-counter {
   color: var(--muted);
   font-size: 12px;
   text-align: right;
@@ -2208,11 +2186,6 @@ textarea.input {
 
 .style-panel .style-card[aria-checked='true'] {
   background: color-mix(in srgb, var(--gold) 11%, var(--surface-2));
-}
-
-.age-input {
-  width: 84px;
-  text-align: center;
 }
 
 .card-hint {

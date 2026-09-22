@@ -4,9 +4,10 @@ import 'maplibre-gl/dist/maplibre-gl.css'
 // MapLibre 6 déduit l'URL de son worker de sa propre URL de module : faux dès qu'un bundler déplace ou fusionne
 // la librairie. On lui fournit donc explicitement un worker empaqueté par Vite (avec ses dépendances).
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
+import { clusterPins, type MapMarker } from '../core/clustering'
 import type { GeoCoordinate } from '../core/geohash'
 import type { PresencePin } from '../core/models'
-import { sportById, sportColor, sportName } from '../core/sports'
+import { CATEGORY_COLORS, CATEGORY_EMOJI, CATEGORY_LABELS, sportById, sportColor, sportName } from '../core/sports'
 import { themeMapStyle } from './mapStyle'
 
 setWorkerUrl(workerUrl)
@@ -60,11 +61,14 @@ interface Props {
 
 interface MarkerRecord {
   marker: Marker
-  pin: PresencePin
+  item: MapMarker
 }
 
 /** À l'échelle du pays les pins de taille normale se chevauchent : on les réduit quand on est loin. */
 const pinScale = (zoom: number): number => (zoom < 5.6 ? 0.62 : zoom < 8 ? 0.82 : 1)
+
+/** Zoom arrondi au quart : sert à recalculer le regroupement sans le refaire à chaque pixel de zoom. */
+const roundZoom = (zoom: number): number => Math.round(zoom * 4) / 4
 
 /** Le style habillé ; à défaut (hors connexion, style illisible), l'URL brute pour que MapLibre fasse de son mieux. */
 async function loadStyle(): Promise<StyleSpecification | string> {
@@ -112,6 +116,22 @@ function renderPin(root: HTMLElement, pin: PresencePin, highlighted?: string): v
   }
 }
 
+/**
+ * Dessine un groupe de pins rassemblés (dézoomé) : une tête plus grande à la couleur de la catégorie, avec le
+ * nombre de pratiquants rassemblés sur le badge (vert) qui porte un simple point sur un pin isolé.
+ */
+function renderCluster(root: HTMLElement, cluster: Extract<MapMarker, { kind: 'cluster' }>): void {
+  const button = root.firstElementChild as HTMLButtonElement
+  root.style.zIndex = cluster.hasActive ? '1' : '0'
+  button.style.setProperty('--pin-color', CATEGORY_COLORS[cluster.category])
+  button.dataset.me = 'false'
+  button.dataset.dim = String(!cluster.hasActive)
+  const categoryLabel = CATEGORY_LABELS[cluster.category].toLowerCase()
+  button.setAttribute('aria-label', `${cluster.count} pratiquants de ${categoryLabel} rassemblés ici : toucher pour zoomer et les séparer`)
+  button.innerHTML = `<span class="pin-head"><span class="pin-emoji">${CATEGORY_EMOJI[cluster.category]}</span></span><span class="pin-count">${cluster.count}</span>`
+  root.querySelector('.pin-label')?.remove()
+}
+
 export const MapView = forwardRef<MapViewHandle, Props>(function MapView(
   { pins, highlightedSport, active, onPinClick, onCameraChange, myCoordinate },
   ref,
@@ -122,6 +142,8 @@ export const MapView = forwardRef<MapViewHandle, Props>(function MapView(
   const meMarkerRef = useRef<Marker | null>(null)
   /** La carte se crée une fois le style récupéré : les marqueurs attendent ce signal. */
   const [mapReady, setMapReady] = useState(false)
+  /** Arrondi au quart de zoom : suffit à refaire le regroupement des pins sans le recalculer à chaque pixel. */
+  const [clusterZoom, setClusterZoom] = useState(roundZoom(FRANCE_VIEW.zoom))
   const onPinClickRef = useRef(onPinClick)
   onPinClickRef.current = onPinClick
   const onCameraChangeRef = useRef(onCameraChange)
@@ -178,7 +200,14 @@ export const MapView = forwardRef<MapViewHandle, Props>(function MapView(
       })
 
       const created = map
-      const applyScale = () => container.style.setProperty('--pin-scale', String(pinScale(created.getZoom())))
+      const applyScale = () => {
+        const zoom = created.getZoom()
+        container.style.setProperty('--pin-scale', String(pinScale(zoom)))
+        setClusterZoom((current) => {
+          const next = roundZoom(zoom)
+          return next === current ? current : next
+        })
+      }
       applyScale()
       created.on('zoom', applyScale)
       const reportCamera = () => onCameraChangeRef.current?.({ bearing: created.getBearing(), pitch: created.getPitch() })
@@ -203,36 +232,45 @@ export const MapView = forwardRef<MapViewHandle, Props>(function MapView(
     }
   }, [])
 
-  // Synchronise les marqueurs avec les pins (créés / déplacés / retirés).
+  // Synchronise les marqueurs avec les pins (créés / déplacés / retirés), regroupés par catégorie de sport une fois
+  // dézoomé : voir core/clustering.ts. Recalculé à chaque cran de zoom (clusterZoom), pas seulement quand les pins changent.
   useEffect(() => {
     const map = mapRef.current
     if (!map || !mapReady) return
     const markers = markersRef.current
     const seen = new Set<string>()
+    const items = clusterPins(pins, clusterZoom, highlightedSport)
 
-    for (const pin of pins) {
-      seen.add(pin.userID)
-      let record = markers.get(pin.userID)
+    for (const item of items) {
+      seen.add(item.id)
+      let record = markers.get(item.id)
       if (!record) {
         // Le Marker de MapLibre pilote le `transform` de son élément racine : les styles vont sur l'enfant.
         const root = document.createElement('div')
         const button = document.createElement('button')
         button.type = 'button'
-        button.className = 'pin'
+        button.className = item.kind === 'cluster' ? 'pin pin-cluster' : 'pin'
         button.addEventListener('click', (event) => {
           event.stopPropagation()
-          const current = markers.get(pin.userID)
-          if (current) onPinClickRef.current(current.pin)
+          const current = markers.get(item.id)?.item
+          if (!current) return
+          if (current.kind === 'pin') onPinClickRef.current(current.pin)
+          // Cluster : on zoome dessus plutôt que d'ouvrir un profil, pour le séparer en pins individuels.
+          else map.easeTo({ center: [current.coordinate.longitude, current.coordinate.latitude], zoom: Math.min(map.getZoom() + 3, 18), duration: 500 })
         })
         root.appendChild(button)
-        // Ancré par sa pointe : la pointe du pin touche la position (approximative) de la personne.
-        const marker = new Marker({ element: root, anchor: 'bottom', opacityWhenCovered: pin.isMe ? '1' : '0.25' }).setLngLat([pin.coordinate.longitude, pin.coordinate.latitude]).addTo(map)
-        record = { marker, pin }
-        markers.set(pin.userID, record)
+        const isMe = item.kind === 'pin' && item.pin.isMe
+        const coordinate = item.kind === 'pin' ? item.pin.coordinate : item.coordinate
+        // Ancré par sa pointe : la pointe du pin touche la position (approximative) du ou des pratiquants.
+        const marker = new Marker({ element: root, anchor: 'bottom', opacityWhenCovered: isMe ? '1' : '0.25' }).setLngLat([coordinate.longitude, coordinate.latitude]).addTo(map)
+        record = { marker, item }
+        markers.set(item.id, record)
       }
-      record.pin = pin
-      record.marker.setLngLat([pin.coordinate.longitude, pin.coordinate.latitude])
-      renderPin(record.marker.getElement(), pin, highlightedSport)
+      record.item = item
+      const coordinate = item.kind === 'pin' ? item.pin.coordinate : item.coordinate
+      record.marker.setLngLat([coordinate.longitude, coordinate.latitude])
+      if (item.kind === 'pin') renderPin(record.marker.getElement(), item.pin, highlightedSport)
+      else renderCluster(record.marker.getElement(), item)
     }
 
     for (const [id, record] of markers) {
@@ -241,7 +279,7 @@ export const MapView = forwardRef<MapViewHandle, Props>(function MapView(
         markers.delete(id)
       }
     }
-  }, [pins, highlightedSport, mapReady])
+  }, [pins, highlightedSport, mapReady, clusterZoom])
 
   // Point "ma position" (hors session) : créé/déplacé/retiré indépendamment des pins de session.
   useEffect(() => {

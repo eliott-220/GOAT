@@ -35,6 +35,21 @@ export const CATEGORY_COLORS: Record<SportCategory, string> = {
   multi: '#5e5ce6',
 }
 
+/** Emoji générique par catégorie : identifie un groupe de pins rassemblés sur la carte (voir core/clustering.ts),
+ * qui peut mélanger plusieurs sports d'une même catégorie (ex. ski + snowboard). */
+export const CATEGORY_EMOJI: Record<SportCategory, string> = {
+  glisse: '❄️',
+  course: '🏃',
+  velo: '🚴',
+  ballon: '⚽',
+  raquette: '🎾',
+  salle: '🧘',
+  nature: '🥾',
+  eau: '🏊',
+  combat: '🥊',
+  multi: '🏅',
+}
+
 export interface Sport {
   id: string
   name: string
