@@ -51,6 +51,11 @@ interface Props {
   onPinClick(pin: PresencePin): void
   /** Appelé à chaque rotation ou inclinaison (boussole, bouton de relief). */
   onCameraChange?(camera: CameraState): void
+  /**
+   * Point "ma position" affiché même hors session (undefined pour le masquer, ex. dès qu'un pin de session me
+   * représente déjà). Purement local : cette position ne vient jamais du backend et n'est jamais envoyée à personne.
+   */
+  myCoordinate?: GeoCoordinate
 }
 
 interface MarkerRecord {
@@ -107,10 +112,14 @@ function renderPin(root: HTMLElement, pin: PresencePin, highlighted?: string): v
   }
 }
 
-export const MapView = forwardRef<MapViewHandle, Props>(function MapView({ pins, highlightedSport, active, onPinClick, onCameraChange }, ref) {
+export const MapView = forwardRef<MapViewHandle, Props>(function MapView(
+  { pins, highlightedSport, active, onPinClick, onCameraChange, myCoordinate },
+  ref,
+) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<MapLibreMap | null>(null)
   const markersRef = useRef(new Map<string, MarkerRecord>())
+  const meMarkerRef = useRef<Marker | null>(null)
   /** La carte se crée une fois le style récupéré : les marqueurs attendent ce signal. */
   const [mapReady, setMapReady] = useState(false)
   const onPinClickRef = useRef(onPinClick)
@@ -186,6 +195,8 @@ export const MapView = forwardRef<MapViewHandle, Props>(function MapView({ pins,
       cancelled = true
       for (const { marker } of markers.values()) marker.remove()
       markers.clear()
+      meMarkerRef.current?.remove()
+      meMarkerRef.current = null
       map?.remove()
       mapRef.current = null
       setMapReady(false)
@@ -231,6 +242,29 @@ export const MapView = forwardRef<MapViewHandle, Props>(function MapView({ pins,
       }
     }
   }, [pins, highlightedSport, mapReady])
+
+  // Point "ma position" (hors session) : créé/déplacé/retiré indépendamment des pins de session.
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !mapReady) return
+
+    if (!myCoordinate) {
+      meMarkerRef.current?.remove()
+      meMarkerRef.current = null
+      return
+    }
+
+    if (!meMarkerRef.current) {
+      const dot = document.createElement('div')
+      dot.className = 'me-locator'
+      dot.innerHTML = '<span class="me-locator-pulse"></span><span class="me-locator-dot"></span>'
+      dot.setAttribute('role', 'img')
+      dot.setAttribute('aria-label', 'Ta position actuelle (visible seulement par toi)')
+      meMarkerRef.current = new Marker({ element: dot, anchor: 'center' }).setLngLat([myCoordinate.longitude, myCoordinate.latitude]).addTo(map)
+    } else {
+      meMarkerRef.current.setLngLat([myCoordinate.longitude, myCoordinate.latitude])
+    }
+  }, [myCoordinate, mapReady])
 
   useEffect(() => {
     if (active) mapRef.current?.resize()

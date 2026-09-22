@@ -134,6 +134,10 @@ export interface PresencePin {
   isVisibleToOthers: boolean
 }
 
+/** Vrai si je suis déjà représenté par un pin (session active ou récente). Sert à éviter d'afficher en même temps
+ * le pin de session (public, position arrondie) et le point « ma position » (local, jamais envoyé au serveur). */
+export const hasMePin = (pins: readonly PresencePin[]): boolean => pins.some((pin) => pin.isMe)
+
 export type AllianceRelation =
   | { kind: 'none' }
   | { kind: 'requestSent'; allianceID: string }

@@ -66,7 +66,11 @@ export class LocationProvider {
     this.onChange()
   }
 
-  /** Position ponctuelle (déclenche la demande d'autorisation du navigateur). Non conservée. */
+  /**
+   * Position ponctuelle (déclenche la demande d'autorisation du navigateur au premier appel).
+   * Conservée dans `coordinate` : c'est ce qui alimente le point « ma position » hors session (jamais envoyé au
+   * serveur — seule une session active diffuse une position, via `start()`/`pushPosition`).
+   */
   currentPosition(): Promise<GeoCoordinate | undefined> {
     if (this.simulated) return Promise.resolve(this.coordinate)
     if (this.authorization === 'unsupported') return Promise.resolve(undefined)
@@ -74,7 +78,10 @@ export class LocationProvider {
       navigator.geolocation.getCurrentPosition(
         (position) => {
           this.setAuthorization('granted')
-          resolve({ latitude: position.coords.latitude, longitude: position.coords.longitude })
+          const coordinate = { latitude: position.coords.latitude, longitude: position.coords.longitude }
+          this.coordinate = coordinate
+          this.onChange()
+          resolve(coordinate)
         },
         (error) => {
           if (error.code === error.PERMISSION_DENIED) this.setAuthorization('denied')

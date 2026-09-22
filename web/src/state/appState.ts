@@ -506,9 +506,13 @@ export class AppState {
     await this.run(async () => {
       await this.backend.stopSession(id)
       await this.refreshSessions()
+      // Coupe le suivi ; si c'était ma dernière session, ça efface aussi la position locale (voir LocationProvider.stop).
       this.updateLiveTasks()
       await this.refreshPins()
       await this.refreshEchoes()
+      // Le point "ma position" vient de disparaître avec elle : on en redemande une tout de suite (pas d'appel
+      // système si la permission est déjà accordée) plutôt que d'attendre le prochain rafraîchissement périodique.
+      if (this.snap.mySessions.length === 0 && this.location.isAuthorized) void this.location.currentPosition()
     })
   }
 

@@ -1363,6 +1363,47 @@ textarea.input {
   font-weight: 700;
 }
 
+/* Point "ma position" hors session : rond bleu neutre (jamais un pin coloré par sport, pour ne pas se confondre
+   avec un sportif actif) avec un halo qui respire doucement, comme le point bleu des cartes système. */
+.me-locator {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+}
+
+.me-locator-dot {
+  position: relative;
+  z-index: 1;
+  width: 16px;
+  height: 16px;
+  border: 3px solid #fff;
+  border-radius: 50%;
+  background: var(--blue);
+  box-shadow: 0 2px 6px rgba(12, 18, 28, 0.4);
+}
+
+.me-locator-pulse {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: var(--blue);
+  opacity: 0.3;
+  animation: locator-breathe 2.6s ease-in-out infinite;
+}
+
+@keyframes locator-breathe {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.32;
+  }
+  50% {
+    transform: scale(2.1);
+    opacity: 0;
+  }
+}
+
 /* ───────── Feuilles modales ───────── */
 
 .backdrop {

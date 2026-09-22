@@ -1,4 +1,5 @@
-import { useCallback, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { hasMePin } from '../core/models'
 import { SPORTS, sportById, sportName } from '../core/sports'
 import { useApp, useNow } from '../state/context'
 import { Avatar, Logo } from './common'
@@ -6,6 +7,10 @@ import { formatTimer } from './format'
 import { Icon } from './Icon'
 import { MapView, type CameraState, type MapViewHandle } from './MapView'
 import { MiniProfileSheet, SessionSheet, StartSessionSheet } from './sheets'
+
+/** Fréquence de rafraîchissement du point "ma position" hors session : juste assez pour suivre un déplacement lent,
+ * bien plus espacé que l'envoi de position en session (12 s, voir appState.ts) puisque rien n'est diffusé ici. */
+const IDLE_LOCATE_INTERVAL_MS = 45_000
 
 export function MapTab({ active, onOpenProfile }: { active: boolean; onOpenProfile: () => void }) {
   const { app, snap } = useApp()
@@ -31,6 +36,19 @@ export function MapTab({ active, onOpenProfile }: { active: boolean; onOpenProfi
   const invisible = snap.me?.visibility.isInvisible === true
   const first = snap.mySessions[0]
 
+  // Point "ma position" : seulement quand aucun pin de session ne me représente déjà (sinon double affichage).
+  const locationGranted = snap.location.authorization === 'granted'
+  const meCoordinate = hasMePin(pins) ? undefined : snap.location.coordinate
+
+  // Une position fraîche dès que la permission est déjà accordée — jamais de demande d'autorisation automatique ici,
+  // seule une action explicite ailleurs (bouton "Me localiser", session, onboarding) la déclenche la première fois.
+  useEffect(() => {
+    if (!active || snap.mySessions.length > 0 || !locationGranted) return
+    void app.locateMe()
+    const id = setInterval(() => void app.locateMe(), IDLE_LOCATE_INTERVAL_MS)
+    return () => clearInterval(id)
+  }, [active, app, snap.mySessions.length, locationGranted])
+
   async function locateMe() {
     const coordinate = await app.locateMe()
     if (coordinate) mapRef.current?.flyTo(coordinate)
@@ -53,6 +71,7 @@ export function MapTab({ active, onOpenProfile }: { active: boolean; onOpenProfi
         active={active}
         onPinClick={(pin) => (pin.isMe ? setSheet('session') : setProfileID(pin.userID))}
         onCameraChange={onCameraChange}
+        myCoordinate={meCoordinate}
       />
 
       <div className="map-top">
