@@ -143,10 +143,10 @@ export function MiniProfileSheet({ userID, onClose }: { userID: string; onClose:
     setLoaded(true)
   }, [app, userID])
 
-  // Recharge aussi quand les Alliances changent ailleurs (ex. l'autre personne accepte pendant que la fiche est ouverte).
+  // Recharge aussi quand les Alliances ou le suivi changent ailleurs (ex. l'autre personne accepte pendant que la fiche est ouverte).
   useEffect(() => {
     void load()
-  }, [load, snap.alliances])
+  }, [load, snap.alliances, snap.follow])
 
   const act = async (action: () => Promise<void>) => {
     await action()
@@ -170,6 +170,14 @@ export function MiniProfileSheet({ userID, onClose }: { userID: string; onClose:
               )}
               <p className="member-since">Membre depuis {formatMonthYearShort(profile.memberSince)}</p>
             </div>
+            <button
+              className={`btn btn-small follow-btn${profile.isFollowing ? '' : ' btn-outline'}`}
+              aria-pressed={profile.isFollowing}
+              onClick={() => void act(() => (profile.isFollowing ? app.unfollowUser(profile.id) : app.followUser(profile.id)))}
+            >
+              <Icon name={profile.isFollowing ? 'check' : 'plus'} size={14} />
+              {profile.isFollowing ? 'Abonné·e' : 'Suivre'}
+            </button>
           </div>
           {profile.bio && <p className="mini-bio">{profile.bio}</p>}
 

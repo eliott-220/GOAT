@@ -290,3 +290,235 @@ describe('démo', () => {
     expect((await backend.allianceOverview(me.id)).allies).toHaveLength(1)
   })
 })
+
+describe('suivi', () => {
+  it('asymétrique : suivre ne demande aucune acceptation, contrairement à une Alliance', async () => {
+    const backend = new InMemoryBackend({ now: () => T0 })
+    const a = await register(backend, 'A')
+    const b = await register(backend, 'B')
+    await backend.follow(a.id, b.id)
+
+    expect((await backend.followOverview(a.id)).following.map((u) => u.firstName)).toEqual(['B'])
+    expect((await backend.followOverview(b.id)).followers.map((u) => u.firstName)).toEqual(['A'])
+    expect((await backend.followOverview(b.id)).following).toEqual([]) // B ne suit pas A en retour
+    expect((await backend.profile(b.id, a.id))!.isFollowing).toBe(true)
+    expect((await backend.profile(a.id, b.id))!.isFollowing).toBe(false)
+  })
+
+  it('se suivre soi-même est refusé ; suivre deux fois ne duplique rien', async () => {
+    const backend = new InMemoryBackend({ now: () => T0 })
+    const a = await register(backend, 'A')
+    const b = await register(backend, 'B')
+    await rejectsWith(backend.follow(a.id, a.id), 'invalid')
+    await backend.follow(a.id, b.id)
+    await backend.follow(a.id, b.id)
+    expect((await backend.followOverview(a.id)).following).toHaveLength(1)
+  })
+
+  it('ne plus suivre retire le lien, sans toucher aux autres', async () => {
+    const backend = new InMemoryBackend({ now: () => T0 })
+    const a = await register(backend, 'A')
+    const b = await register(backend, 'B')
+    const c = await register(backend, 'C')
+    await backend.follow(a.id, b.id)
+    await backend.follow(a.id, c.id)
+    await backend.unfollow(a.id, b.id)
+    expect((await backend.followOverview(a.id)).following.map((u) => u.firstName)).toEqual(['C'])
+  })
+
+  it('un blocage rompt aussi le suivi, dans les deux sens', async () => {
+    const backend = new InMemoryBackend({ now: () => T0 })
+    const a = await register(backend, 'A')
+    const b = await register(backend, 'B')
+    await backend.follow(a.id, b.id)
+    await backend.follow(b.id, a.id)
+    await backend.block(b.id, a.id)
+    expect((await backend.followOverview(a.id)).following).toEqual([])
+    expect((await backend.followOverview(a.id)).followers).toEqual([])
+  })
+
+  it('suggère en priorité les profils qui partagent un sport, jamais soi-même ni déjà suivi', async () => {
+    const backend = new InMemoryBackend({ now: () => T0 })
+    const me = await register(backend, 'Moi', ['ski'])
+    const shared = await register(backend, 'PartageLeSki', ['ski', 'yoga'])
+    const other = await register(backend, 'AutreSport', ['yoga'])
+    await backend.follow(me.id, other.id) // déjà suivi : ne doit plus être suggéré
+
+    const suggestions = await backend.suggestedPeople(me.id)
+    const names = suggestions.map((s) => s.user.firstName)
+    expect(names).toContain('PartageLeSki')
+    expect(names).not.toContain('AutreSport')
+    expect(names).not.toContain('Moi')
+    expect(suggestions.find((s) => s.user.id === shared.id)!.sharedSportID).toBe('ski')
+  })
+
+  it("ne suggère jamais un profil bloqué, ni un profil \"mes Alliances\" à un inconnu", async () => {
+    const backend = new InMemoryBackend({ now: () => T0 })
+    const me = await register(backend, 'Moi')
+    const blocked = await register(backend, 'Bloqué')
+    await register(backend, 'Fermé', ['ski'], 'myAlliances')
+    await backend.block(blocked.id, me.id)
+
+    const names = (await backend.suggestedPeople(me.id)).map((s) => s.user.firstName)
+    expect(names).not.toContain('Bloqué')
+    expect(names).not.toContain('Fermé')
+  })
+
+  it('la recherche trouve par prénom, insensible à la casse et aux accents, jamais soi-même', async () => {
+    const backend = new InMemoryBackend({ now: () => T0 })
+    const me = await register(backend, 'Moi')
+    await register(backend, 'Léa')
+    await register(backend, 'Théo')
+
+    expect((await backend.searchPeople(me.id, 'lea')).map((u) => u.firstName)).toEqual(['Léa'])
+    expect((await backend.searchPeople(me.id, 'THÉO')).map((u) => u.firstName)).toEqual(['Théo'])
+    expect(await backend.searchPeople(me.id, 'oi')).toEqual([]) // "Moi" ne se trouve pas soi-même
+    expect(await backend.searchPeople(me.id, '')).toEqual([])
+  })
+})
+
+describe('actualité', () => {
+  it("une première session n'est jamais un record : il en faut au moins deux pour comparer", async () => {
+    const clock = makeClock()
+    const backend = new InMemoryBackend({ now: clock.now })
+    const a = await register(backend, 'A')
+    const s = await backend.startSession(a.id, 'ski')
+    clock.advance(30)
+    await backend.stopSession(s.id)
+
+    expect(await backend.feed(a.id)).toEqual([])
+  })
+
+  it('une session plus longue que toutes les précédentes du même sport devient un record ; une plus courte non', async () => {
+    const clock = makeClock()
+    const backend = new InMemoryBackend({ now: clock.now })
+    const a = await register(backend, 'A', ['ski'])
+
+    const first = await backend.startSession(a.id, 'ski')
+    clock.advance(30)
+    await backend.stopSession(first.id) // 30 min, pas encore de record possible
+
+    const second = await backend.startSession(a.id, 'ski')
+    clock.advance(45)
+    await backend.stopSession(second.id) // 45 min > 30 min : record
+
+    const third = await backend.startSession(a.id, 'ski')
+    clock.advance(10)
+    await backend.stopSession(third.id) // 10 min < 45 min : pas un record
+
+    const records = (await backend.feed(a.id)).filter((i) => i.kind === 'record' && i.recordType === 'longestSession')
+    expect(records).toHaveLength(1)
+    expect(records[0]).toMatchObject({ durationMs: 45 * 60_000, sportID: 'ski' })
+  })
+
+  it('une étape (10 sessions terminées, tous sports confondus) déclenche un évènement "milestone"', async () => {
+    const clock = makeClock()
+    const backend = new InMemoryBackend({ now: clock.now })
+    const a = await register(backend, 'A', ['ski', 'running'])
+    for (let i = 0; i < 10; i++) {
+      const s = await backend.startSession(a.id, i % 2 === 0 ? 'ski' : 'running') // sports variés, comptés tous ensemble
+      clock.advance(5)
+      await backend.stopSession(s.id)
+    }
+    const milestones = (await backend.feed(a.id)).filter((i) => i.kind === 'record' && i.recordType === 'milestone')
+    expect(milestones).toHaveLength(1)
+    expect(milestones[0]).toMatchObject({ sessionCount: 10 })
+  })
+
+  it('une session en cours apparaît, mais pas la mienne, et jamais une session déjà terminée', async () => {
+    const backend = new InMemoryBackend({ now: () => T0 })
+    const me = await register(backend, 'Moi', ['ski'])
+    const other = await register(backend, 'Autre', ['ski', 'running'])
+    const mine = await backend.startSession(me.id, 'ski')
+    await backend.startSession(other.id, 'ski')
+    const finished = await backend.startSession(other.id, 'running')
+    await backend.stopSession(finished.id)
+
+    const news = (await backend.feed(me.id)).filter((i) => i.kind === 'newSession')
+    expect(news).toHaveLength(1)
+    expect(news[0]).toMatchObject({ firstName: 'Autre', sportID: 'ski' })
+    await backend.stopSession(mine.id) // nettoyage, non vérifié
+  })
+
+  it('une rafale de départs simultanés ne noie pas les autres évènements : les sessions sont plafonnées à un tiers du fil', async () => {
+    const backend = new InMemoryBackend({ now: () => T0 })
+    const viewer = await register(backend, 'Moi')
+    await backend.createTribu('Poudreuse', viewer.id) // un évènement plus rare, mais qui doit rester visible
+
+    for (let i = 0; i < 20; i++) {
+      const bot = await register(backend, `Bot${i}`, ['ski'])
+      await backend.startSession(bot.id, 'ski') // 20 départs "en même temps"
+    }
+
+    const feed = await backend.feed(viewer.id, 30)
+    const news = feed.filter((i) => i.kind === 'newSession')
+    const tribu = feed.filter((i) => i.kind === 'tribuCreated')
+    expect(news.length).toBeLessThan(20) // pas les 20, même si tous plus "récents"
+    expect(news.length).toBeLessThanOrEqual(10) // un tiers de 30
+    expect(tribu).toHaveLength(1) // survit malgré la rafale
+  })
+
+  it('une Alliance formée devient un évènement, daté de son acceptation, pas de la demande', async () => {
+    const clock = makeClock()
+    const backend = new InMemoryBackend({ now: clock.now })
+    const a = await register(backend, 'A')
+    const b = await register(backend, 'B')
+    const alliance = await backend.requestAlliance(a.id, b.id)
+    clock.advance(120)
+    await backend.respondToAlliance(alliance.id, b.id, true)
+
+    const events = (await backend.feed(a.id)).filter((i) => i.kind === 'allianceFormed')
+    expect(events).toHaveLength(1)
+    expect(events[0]).toMatchObject({ userAName: 'A', userBName: 'B', at: T0 + 120 * 60_000 })
+  })
+
+  it("une demande d'Alliance en attente n'apparaît pas : seule l'acceptation est un évènement", async () => {
+    const backend = new InMemoryBackend({ now: () => T0 })
+    const a = await register(backend, 'A')
+    const b = await register(backend, 'B')
+    await backend.requestAlliance(a.id, b.id)
+    expect((await backend.feed(a.id)).filter((i) => i.kind === 'allianceFormed')).toEqual([])
+  })
+
+  it('une tribu créée devient un évènement', async () => {
+    const backend = new InMemoryBackend({ now: () => T0 })
+    const a = await register(backend, 'A')
+    await backend.createTribu('Poudreuse', a.id)
+    const events = (await backend.feed(a.id)).filter((i) => i.kind === 'tribuCreated')
+    expect(events).toMatchObject([{ tribuName: 'Poudreuse', creatorName: 'A' }])
+  })
+
+  it('respecte la visibilité : rien pour un profil "mes Alliances" tant qu\'on n\'est pas alliés, rien pour un profil bloqué', async () => {
+    const clock = makeClock()
+    const backend = new InMemoryBackend({ now: clock.now })
+    const viewer = await register(backend, 'Moi')
+    const closed = await register(backend, 'Fermé', ['ski'], 'myAlliances')
+    const blocked = await register(backend, 'Bloqué', ['ski'])
+    await backend.block(blocked.id, viewer.id)
+
+    for (const user of [closed, blocked]) {
+      const first = await backend.startSession(user.id, 'ski')
+      clock.advance(10)
+      await backend.stopSession(first.id)
+      const second = await backend.startSession(user.id, 'ski')
+      clock.advance(20)
+      await backend.stopSession(second.id)
+    }
+
+    expect(await backend.feed(viewer.id)).toEqual([])
+  })
+
+  it('trie du plus récent au plus ancien et respecte la limite', async () => {
+    const clock = makeClock()
+    const backend = new InMemoryBackend({ now: clock.now })
+    const a = await register(backend, 'A')
+    for (let i = 0; i < 5; i++) {
+      await backend.createTribu(`Tribu ${i}`, a.id)
+      clock.advance(10)
+    }
+    const feed = await backend.feed(a.id, 3)
+    expect(feed).toHaveLength(3)
+    expect(feed.map((i) => i.at)).toEqual([...feed.map((i) => i.at)].sort((x, y) => y - x))
+    expect(feed[0]).toMatchObject({ tribuName: 'Tribu 4' }) // le plus récent en premier
+  })
+})

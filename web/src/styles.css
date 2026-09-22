@@ -1033,6 +1033,31 @@ textarea.input {
   font-weight: 800;
 }
 
+/* Sélecteur à segments (feuilles, fond opaque) : bascule entre plusieurs vues, ex. Abonnements/Abonnés/Découvrir.
+   Distinct de .chip (verre dépoli pensé pour flotter sur la carte, hors de propos sur un fond de carte plein). */
+.segmented {
+  display: flex;
+  gap: 6px;
+  padding: 2px 0 14px;
+}
+
+.segmented-item {
+  flex: 1;
+  padding: 9px 6px;
+  border: 0;
+  border-radius: 11px;
+  background: var(--surface-2);
+  color: var(--text-2);
+  font-size: 13.5px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.segmented-item[aria-selected='true'] {
+  background: var(--gold-grad);
+  color: var(--gold-ink);
+}
+
 /* Boutons ronds, à droite de la carte : revoir la France, boussole, relief, me localiser. */
 .map-controls {
   position: absolute;
@@ -1489,10 +1514,16 @@ textarea.input {
 
 .mini-id {
   display: flex;
+  flex: 1;
   flex-direction: column;
   align-items: flex-start;
   gap: 6px;
   min-width: 0;
+}
+
+.follow-btn {
+  flex: none;
+  align-self: flex-start;
 }
 
 .mini-name {
@@ -1760,6 +1791,36 @@ textarea.input {
 
 .tone-purple {
   color: var(--purple);
+}
+
+/* Pastille colorée par évènement (Actualité) : même forme que .sport-emoji, teinte au lieu de couleur de sport. */
+.feed-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 11px;
+}
+
+.tone-bg-gold {
+  background: rgba(246, 179, 0, 0.16);
+  color: var(--gold);
+}
+
+.tone-bg-green {
+  background: rgba(52, 208, 92, 0.16);
+  color: var(--green);
+}
+
+.tone-bg-purple {
+  background: rgba(169, 112, 255, 0.16);
+  color: var(--purple);
+}
+
+.tone-bg-blue {
+  background: rgba(59, 155, 255, 0.16);
+  color: var(--blue);
 }
 
 .hex-row {

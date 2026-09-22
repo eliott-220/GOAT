@@ -82,6 +82,8 @@ export interface Alliance {
   /** Destinataire : seul lui peut accepter. */
   userB: string
   status: AllianceStatus
+  /** Timestamp (ms) de l'acceptation ; absent tant que `status` est `pending`. Sert à dater l'événement dans l'actualité. */
+  acceptedAt?: number
 }
 
 export const involves = (alliance: Alliance, userID: string): boolean => alliance.userA === userID || alliance.userB === userID
@@ -92,6 +94,19 @@ export interface Tribu {
   name: string
   creatorID: string
   memberIDs: string[]
+  /** Timestamp (ms) de création. Sert à dater l'événement dans l'actualité. */
+  createdAt: number
+}
+
+/**
+ * Suivi asymétrique façon Instagram : je peux suivre quelqu'un sans qu'il me suive en retour, sans demande ni
+ * acceptation — à la différence d'une Alliance (réciproque, qui exige une acceptation du destinataire). Les deux
+ * coexistent : le suivi sert à garder un œil sur quelqu'un, l'Alliance à se connecter réellement.
+ */
+export interface Follow {
+  followerID: string
+  followingID: string
+  createdAt: number
 }
 
 /** Suggestion générée automatiquement à partir de la pratique commune. Ne connecte personne d'elle-même. */
@@ -154,6 +169,8 @@ export interface MiniProfile {
   sportIDs: string[]
   currentSportIDs: string[]
   relation: AllianceRelation
+  /** Vrai si le viewer suit déjà ce profil (indépendant de `relation`, qui ne concerne que les Alliances). */
+  isFollowing: boolean
 }
 
 export interface AllianceEntry {
@@ -181,6 +198,28 @@ export interface EchoSuggestion {
   user: User
   sportID: string
 }
+
+export interface FollowOverview {
+  following: User[]
+  followers: User[]
+}
+
+export const EMPTY_FOLLOW: FollowOverview = { following: [], followers: [] }
+
+/** Une personne à suivre (recherche ou suggestion), avec le sport commun qui justifie la suggestion (absent en recherche). */
+export interface PersonSuggestion {
+  user: User
+  sharedSportID?: string
+}
+
+// MARK: - Actualité
+
+export type FeedItem =
+  | { id: string; kind: 'record'; at: number; userID: string; firstName: string; sportID: string; recordType: 'longestSession'; durationMs: number }
+  | { id: string; kind: 'record'; at: number; userID: string; firstName: string; sportID: string; recordType: 'milestone'; sessionCount: number }
+  | { id: string; kind: 'newSession'; at: number; userID: string; firstName: string; sportID: string }
+  | { id: string; kind: 'allianceFormed'; at: number; userAID: string; userAName: string; userBID: string; userBName: string }
+  | { id: string; kind: 'tribuCreated'; at: number; tribuID: string; tribuName: string; creatorID: string; creatorName: string }
 
 // MARK: - Sélection de sports
 

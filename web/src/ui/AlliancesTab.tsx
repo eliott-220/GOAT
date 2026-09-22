@@ -5,13 +5,15 @@ import { userSportIDs } from '../core/models'
 import { useApp } from '../state/context'
 import { Avatar, PageHead, Panel, Sheet } from './common'
 import { Icon } from './Icon'
+import { PeopleSheet } from './PeopleSheet'
 import { MiniProfileSheet } from './sheets'
 
 export function AlliancesTab() {
   const { app, snap } = useApp()
   const [profileID, setProfileID] = useState<string | null>(null)
   const [newTribu, setNewTribu] = useState(false)
-  const { alliances, tribus } = snap
+  const [people, setPeople] = useState<'following' | 'followers' | 'discover' | null>(null)
+  const { alliances, tribus, follow } = snap
 
   const person = (user: User) => (
     <button className="row-button person" onClick={() => setProfileID(user.id)}>
@@ -33,6 +35,28 @@ export function AlliancesTab() {
           </button>
         }
       />
+
+      <Panel
+        title="Abonnements"
+        action={
+          <button className="link-btn" onClick={() => setPeople('discover')}>
+            Trouver des gens
+          </button>
+        }
+      >
+        <button className="row row-button" onClick={() => setPeople('following')}>
+          <span className="row-main">
+            <span className="row-title">{follow.following.length} abonnement{follow.following.length !== 1 ? 's' : ''}</span>
+          </span>
+          <Icon name="chevronRight" size={18} />
+        </button>
+        <button className="row row-button" onClick={() => setPeople('followers')}>
+          <span className="row-main">
+            <span className="row-title">{follow.followers.length} abonné{follow.followers.length !== 1 ? 's' : ''}</span>
+          </span>
+          <Icon name="chevronRight" size={18} />
+        </button>
+      </Panel>
 
       {alliances.incoming.length > 0 && (
         <Panel title="Demandes reçues" count={alliances.incoming.length}>
@@ -106,6 +130,7 @@ export function AlliancesTab() {
 
       {profileID && <MiniProfileSheet userID={profileID} onClose={() => setProfileID(null)} />}
       {newTribu && <NewTribuSheet onClose={() => setNewTribu(false)} />}
+      {people && <PeopleSheet initialTab={people} onClose={() => setPeople(null)} />}
     </>
   )
 }

@@ -3,7 +3,10 @@ import type {
   Alliance,
   AllianceOverview,
   EchoSuggestion,
+  FeedItem,
+  FollowOverview,
   MiniProfile,
+  PersonSuggestion,
   PresencePin,
   Tribu,
   TribuOverview,
@@ -74,6 +77,17 @@ export interface PresenceBackend {
 
   // Echos (lecture seule : ils sont générés automatiquement)
   echoes(userID: string): Promise<EchoSuggestion[]>
+
+  // Suivi (asymétrique, façon Instagram : jamais de demande ni d'acceptation, voir Follow)
+  follow(followerID: string, targetID: string): Promise<void>
+  unfollow(followerID: string, targetID: string): Promise<void>
+  followOverview(userID: string): Promise<FollowOverview>
+  /** Personnes à découvrir : pas déjà suivies, ni bloquées, ni soi-même. `sharedSportID` si connu (raison affichée). */
+  suggestedPeople(viewerID: string, limit?: number): Promise<PersonSuggestion[]>
+  searchPeople(viewerID: string, query: string): Promise<User[]>
+
+  // Actualité : évènements dérivés (records, nouvelles sessions, Alliances, tribus), les plus récents en premier.
+  feed(viewerID: string, limit?: number): Promise<FeedItem[]>
 
   // Modération
   block(blockedID: string, blockerID: string): Promise<void>

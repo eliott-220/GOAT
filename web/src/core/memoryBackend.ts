@@ -5,6 +5,7 @@ import {
   otherThan,
   pairKey,
   practices,
+  sessionDuration,
   sessionStatus,
   userSportIDs,
   type ActivitySession,
@@ -13,7 +14,11 @@ import {
   type AllianceRelation,
   type Block,
   type EchoSuggestion,
+  type FeedItem,
+  type Follow,
+  type FollowOverview,
   type MiniProfile,
+  type PersonSuggestion,
   type PresencePin,
   type Report,
   type Tribu,
@@ -21,8 +26,11 @@ import {
   type User,
 } from './models'
 import { canSee, canSuggest, generateEchoes, SocialGraph, type EchoOptions } from './rules'
-import { sportById } from './sports'
+import { normalizeForSearch, sportById } from './sports'
 import { uuid } from './uuid'
+
+/** Étapes (nombre total de sessions terminées) qui déclenchent un évènement "record" dans l'actualité. */
+const SESSION_MILESTONES = [10, 25, 50, 100, 200]
 
 export interface InMemoryBackendOptions {
   now?: () => number
@@ -42,6 +50,7 @@ export class InMemoryBackend implements PresenceBackend {
   private sessions = new Map<string, ActivitySession>()
   private alliances = new Map<string, Alliance>()
   private tribusById = new Map<string, Tribu>()
+  private follows: Follow[] = []
   private blocks: Block[] = []
   private reports: Report[] = []
   private botIDs = new Set<string>()
@@ -127,6 +136,7 @@ export class InMemoryBackend implements PresenceBackend {
       sportIDs: userSportIDs(target),
       currentSportIDs: current,
       relation,
+      isFollowing: this.follows.some((f) => f.followerID === viewerID && f.followingID === targetID),
     }
   }
 
@@ -244,7 +254,7 @@ export class InMemoryBackend implements PresenceBackend {
 
   private botAccepts(allianceID: string): void {
     const alliance = this.alliances.get(allianceID)
-    if (alliance?.status === 'pending') this.alliances.set(allianceID, { ...alliance, status: 'accepted' })
+    if (alliance?.status === 'pending') this.alliances.set(allianceID, { ...alliance, status: 'accepted', acceptedAt: this.now() })
   }
 
   async respondToAlliance(id: string, userID: string, accept: boolean): Promise<void> {
@@ -252,7 +262,7 @@ export class InMemoryBackend implements PresenceBackend {
     if (!alliance) throw new BackendError('allianceNotFound')
     // Jamais unilatérale : seul le destinataire d'une demande en attente peut répondre.
     if (alliance.userB !== userID || alliance.status !== 'pending') throw new BackendError('notAllowed')
-    if (accept) this.alliances.set(id, { ...alliance, status: 'accepted' })
+    if (accept) this.alliances.set(id, { ...alliance, status: 'accepted', acceptedAt: this.now() })
     else this.alliances.delete(id)
   }
 
@@ -265,7 +275,7 @@ export class InMemoryBackend implements PresenceBackend {
     const trimmed = name.trim()
     if (!trimmed) throw new BackendError('invalid', 'Donne un nom à ta tribu.')
     if (!this.users.has(creatorID)) throw new BackendError('userNotFound')
-    const tribu: Tribu = { id: uuid(), name: trimmed, creatorID, memberIDs: [creatorID] }
+    const tribu: Tribu = { id: uuid(), name: trimmed, creatorID, memberIDs: [creatorID], createdAt: this.now() }
     this.tribusById.set(tribu.id, tribu)
     return tribu
   }
@@ -307,16 +317,195 @@ export class InMemoryBackend implements PresenceBackend {
     return suggestions
   }
 
+  // MARK: Suivi
+
+  async follow(followerID: string, targetID: string): Promise<void> {
+    if (followerID === targetID) throw new BackendError('invalid', 'Tu ne peux pas te suivre toi-même.')
+    if (!this.users.has(followerID) || !this.users.has(targetID)) throw new BackendError('userNotFound')
+    if (this.graph().isBlocked(followerID, targetID)) throw new BackendError('notAllowed')
+    if (this.follows.some((f) => f.followerID === followerID && f.followingID === targetID)) return
+    this.follows.push({ followerID, followingID: targetID, createdAt: this.now() })
+  }
+
+  async unfollow(followerID: string, targetID: string): Promise<void> {
+    this.follows = this.follows.filter((f) => !(f.followerID === followerID && f.followingID === targetID))
+  }
+
+  async followOverview(userID: string): Promise<FollowOverview> {
+    const graph = this.graph()
+    const byName = (a: User, b: User) => a.firstName.localeCompare(b.firstName, 'fr')
+    const resolve = (ids: string[]) =>
+      ids
+        .map((id) => this.users.get(id))
+        .filter((u): u is User => u !== undefined && !graph.isBlocked(userID, u.id))
+        .sort(byName)
+    return {
+      following: resolve(this.follows.filter((f) => f.followerID === userID).map((f) => f.followingID)),
+      followers: resolve(this.follows.filter((f) => f.followingID === userID).map((f) => f.followerID)),
+    }
+  }
+
+  async suggestedPeople(viewerID: string, limit = 12): Promise<PersonSuggestion[]> {
+    const viewer = this.users.get(viewerID)
+    if (!viewer) return []
+    const graph = this.graph()
+    const alreadyFollowing = new Set(this.follows.filter((f) => f.followerID === viewerID).map((f) => f.followingID))
+    const viewerSports = new Set(userSportIDs(viewer))
+
+    const scored = [...this.users.values()]
+      .filter((u) => u.id !== viewerID && !alreadyFollowing.has(u.id) && !u.visibility.isInvisible && canSuggest(u, viewer, graph))
+      .map((user) => ({ user, sharedSportID: userSportIDs(user).find((id) => viewerSports.has(id)) }))
+    // Un sport en commun d'abord (comme un Echo), puis ordre alphabétique : stable et prévisible plutôt qu'aléatoire.
+    scored.sort((a, b) => Number(b.sharedSportID !== undefined) - Number(a.sharedSportID !== undefined) || a.user.firstName.localeCompare(b.user.firstName, 'fr'))
+    return scored.slice(0, limit)
+  }
+
+  async searchPeople(viewerID: string, query: string): Promise<User[]> {
+    const viewer = this.users.get(viewerID)
+    const needle = normalizeForSearch(query.trim())
+    if (!viewer || !needle) return []
+    const graph = this.graph()
+    return [...this.users.values()]
+      .filter((u) => u.id !== viewerID && canSuggest(u, viewer, graph) && normalizeForSearch(u.firstName).includes(needle))
+      .sort((a, b) => a.firstName.localeCompare(b.firstName, 'fr'))
+      .slice(0, 30)
+  }
+
+  // MARK: Actualité
+
+  /**
+   * Évènements dérivés des données existantes, jamais stockés à part : records personnels (une session qui bat
+   * toutes les précédentes du même sport, ou une étape franchie), sessions en cours, Alliances formées, tribus
+   * créées. Respecte les mêmes règles de visibilité qu'un Echo (pas de "myAlliances" pour un inconnu, jamais
+   * quelqu'un de bloqué), plus mes propres évènements.
+   */
+  async feed(viewerID: string, limit = 30): Promise<FeedItem[]> {
+    const viewer = this.users.get(viewerID)
+    if (!viewer) return []
+    const graph = this.graph()
+    const visible = (targetID: string): boolean => {
+      if (targetID === viewerID) return true
+      const target = this.users.get(targetID)
+      return target !== undefined && !target.visibility.isInvisible && canSuggest(target, viewer, graph)
+    }
+
+    const items: FeedItem[] = []
+
+    // Records : sessions terminées groupées par (utilisateur, sport), triées par date de début ; "record" seulement
+    // si elle bat au moins une tentative précédente (sinon la toute première session serait un "record" trivial).
+    const bySportUser = new Map<string, ActivitySession[]>()
+    for (const session of this.sessions.values()) {
+      if (session.endedAt === undefined || !visible(session.userID)) continue
+      const key = `${session.userID}|${session.sportID}`
+      const list = bySportUser.get(key) ?? []
+      list.push(session)
+      bySportUser.set(key, list)
+    }
+    for (const list of bySportUser.values()) {
+      const user = this.users.get(list[0]!.userID)
+      if (!user) continue
+      let best = 0
+      for (const [index, session] of [...list].sort((a, b) => a.startedAt - b.startedAt).entries()) {
+        const duration = sessionDuration(session, session.endedAt!)
+        if (index > 0 && duration > best) {
+          items.push({
+            id: `record:${session.id}`,
+            kind: 'record',
+            at: session.endedAt!,
+            userID: user.id,
+            firstName: user.firstName,
+            sportID: session.sportID,
+            recordType: 'longestSession',
+            durationMs: duration,
+          })
+        }
+        best = Math.max(best, duration)
+      }
+    }
+
+    // Étapes : Nème session terminée (tous sports confondus).
+    const byUser = new Map<string, ActivitySession[]>()
+    for (const session of this.sessions.values()) {
+      if (session.endedAt === undefined || !visible(session.userID)) continue
+      const list = byUser.get(session.userID) ?? []
+      list.push(session)
+      byUser.set(session.userID, list)
+    }
+    for (const list of byUser.values()) {
+      const user = this.users.get(list[0]!.userID)
+      if (!user) continue
+      for (const [index, session] of [...list].sort((a, b) => a.startedAt - b.startedAt).entries()) {
+        const count = index + 1
+        if (!SESSION_MILESTONES.includes(count)) continue
+        items.push({
+          id: `milestone:${session.id}`,
+          kind: 'record',
+          at: session.endedAt!,
+          userID: user.id,
+          firstName: user.firstName,
+          sportID: session.sportID,
+          recordType: 'milestone',
+          sessionCount: count,
+        })
+      }
+    }
+
+    // Sessions en cours seulement (pas tout l'historique, qui noierait le reste sous des débuts de session anciens).
+    // Plafonnées à un tiers du fil : sans ça, une rafale de départs simultanés (comme au lancement de la démo)
+    // noierait aussi les records et évènements communautaires, plus rares mais plus intéressants.
+    const newSessions: FeedItem[] = []
+    for (const session of this.sessions.values()) {
+      if (session.endedAt !== undefined || session.userID === viewerID || !visible(session.userID)) continue
+      const user = this.users.get(session.userID)
+      if (!user) continue
+      newSessions.push({ id: `session:${session.id}`, kind: 'newSession', at: session.startedAt, userID: user.id, firstName: user.firstName, sportID: session.sportID })
+    }
+    newSessions.sort((a, b) => b.at - a.at)
+    items.push(...newSessions.slice(0, Math.max(3, Math.ceil(limit / 3))))
+
+    // Alliances formées (acceptées des deux côtés).
+    for (const alliance of this.alliances.values()) {
+      if (alliance.status !== 'accepted' || alliance.acceptedAt === undefined) continue
+      if (!visible(alliance.userA) && !visible(alliance.userB)) continue
+      const userA = this.users.get(alliance.userA)
+      const userB = this.users.get(alliance.userB)
+      if (!userA || !userB) continue
+      items.push({
+        id: `alliance:${alliance.id}`,
+        kind: 'allianceFormed',
+        at: alliance.acceptedAt,
+        userAID: userA.id,
+        userAName: userA.firstName,
+        userBID: userB.id,
+        userBName: userB.firstName,
+      })
+    }
+
+    // Tribus créées.
+    for (const tribu of this.tribusById.values()) {
+      if (!visible(tribu.creatorID)) continue
+      const creator = this.users.get(tribu.creatorID)
+      if (!creator) continue
+      items.push({ id: `tribu:${tribu.id}`, kind: 'tribuCreated', at: tribu.createdAt, tribuID: tribu.id, tribuName: tribu.name, creatorID: creator.id, creatorName: creator.firstName })
+    }
+
+    items.sort((a, b) => b.at - a.at)
+    return items.slice(0, limit)
+  }
+
   // MARK: Modération
 
   async block(blockedID: string, blockerID: string): Promise<void> {
     if (blockerID === blockedID) throw new BackendError('invalid', 'Tu ne peux pas te bloquer toi-même.')
     if (!this.users.has(blockedID)) throw new BackendError('userNotFound')
     if (!this.blocks.some((b) => b.blocker === blockerID && b.blocked === blockedID)) this.blocks.push({ blocker: blockerID, blocked: blockedID })
-    // Un blocage rompt aussi toute Alliance ou demande en cours.
+    // Un blocage rompt aussi toute Alliance ou demande en cours, et le suivi dans les deux sens.
     for (const [id, alliance] of this.alliances) {
       if (involves(alliance, blockerID) && involves(alliance, blockedID)) this.alliances.delete(id)
     }
+    this.follows = this.follows.filter(
+      (f) => !(f.followerID === blockerID && f.followingID === blockedID) && !(f.followerID === blockedID && f.followingID === blockerID),
+    )
   }
 
   async unblock(blockedID: string, blockerID: string): Promise<void> {

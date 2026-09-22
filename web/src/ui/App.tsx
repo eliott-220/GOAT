@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { AppState } from '../state/appState'
 import { AppProvider, useApp } from '../state/context'
+import { ActualiteTab } from './ActualiteTab'
 import { AlliancesTab } from './AlliancesTab'
 import { AuthScreen, NewPasswordScreen } from './AuthScreen'
 import { EchoesTab } from './EchoesTab'
@@ -57,10 +58,11 @@ function Shell() {
   )
 }
 
-type Tab = 'map' | 'alliances' | 'echoes' | 'profile'
+type Tab = 'map' | 'actualite' | 'alliances' | 'echoes' | 'profile'
 
 const TABS: { id: Tab; label: string; icon: IconName }[] = [
   { id: 'map', label: 'Carte', icon: 'map' },
+  { id: 'actualite', label: 'Actualité', icon: 'activity' },
   { id: 'alliances', label: 'Alliances', icon: 'people' },
   { id: 'echoes', label: 'Echos', icon: 'radar' },
   { id: 'profile', label: 'Profil', icon: 'person' },
@@ -76,6 +78,9 @@ function MainTabs() {
       {/* Tous les onglets restent montés (la carte coûte cher à recréer) ; les autres sont simplement masqués. */}
       <div className="panel panel-map" hidden={tab !== 'map'} role="tabpanel">
         <MapTab active={tab === 'map'} onOpenProfile={() => setTab('profile')} />
+      </div>
+      <div className="panel" hidden={tab !== 'actualite'} role="tabpanel">
+        <ActualiteTab />
       </div>
       <div className="panel" hidden={tab !== 'alliances'} role="tabpanel">
         <AlliancesTab />

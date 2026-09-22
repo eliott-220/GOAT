@@ -7,12 +7,16 @@ import { InMemoryBackend } from '../core/memoryBackend'
 import {
   DEFAULT_VISIBILITY,
   EMPTY_ALLIANCES,
+  EMPTY_FOLLOW,
   EMPTY_TRIBUS,
   primarySportID,
   type ActivitySession,
   type AllianceOverview,
   type EchoSuggestion,
+  type FeedItem,
+  type FollowOverview,
   type MiniProfile,
+  type PersonSuggestion,
   type PresencePin,
   type TribuOverview,
   type User,
@@ -48,6 +52,9 @@ export interface AppSnapshot {
   alliances: AllianceOverview
   tribus: TribuOverview
   echoes: EchoSuggestion[]
+  follow: FollowOverview
+  /** Actualité : records, sessions en cours, Alliances formées, tribus créées (voir PresenceBackend.feed). */
+  feed: FeedItem[]
   blockedUsers: User[]
   /** Filtre de la carte : undefined = tous les sports. */
   sportFilter?: string
@@ -129,6 +136,8 @@ export class AppState {
       history: [],
       alliances: EMPTY_ALLIANCES,
       tribus: EMPTY_TRIBUS,
+      follow: EMPTY_FOLLOW,
+      feed: [],
       echoes: [],
       blockedUsers: [],
       location: this.location.snapshot(),
@@ -245,6 +254,8 @@ export class AppState {
       blockedUsers: [],
       alliances: EMPTY_ALLIANCES,
       tribus: EMPTY_TRIBUS,
+      follow: EMPTY_FOLLOW,
+      feed: [],
       phase: 'onboarding',
     })
     this.updateLiveTasks()
@@ -429,6 +440,8 @@ export class AppState {
       blockedUsers: [],
       alliances: EMPTY_ALLIANCES,
       tribus: EMPTY_TRIBUS,
+      follow: EMPTY_FOLLOW,
+      feed: [],
       sportFilter: undefined,
       phase: 'signedOut',
     })
@@ -552,6 +565,37 @@ export class AppState {
     })
   }
 
+  /** Suivi asymétrique (façon Instagram) : instantané, sans demande ni acceptation — voir Follow. */
+  async followUser(userID: string): Promise<void> {
+    const me = this.snap.me
+    if (!me) return
+    await this.run(async () => {
+      await this.backend.follow(me.id, userID)
+      await this.refreshSocial()
+    })
+  }
+
+  async unfollowUser(userID: string): Promise<void> {
+    const me = this.snap.me
+    if (!me) return
+    await this.run(async () => {
+      await this.backend.unfollow(me.id, userID)
+      await this.refreshSocial()
+    })
+  }
+
+  /** Personnes à découvrir (pas déjà suivies), pour l'écran "Trouver des gens à suivre". */
+  suggestedPeople(): Promise<PersonSuggestion[]> {
+    const me = this.snap.me
+    return me ? this.backend.suggestedPeople(me.id) : Promise.resolve([])
+  }
+
+  /** Recherche par prénom, pour le même écran. */
+  searchPeople(query: string): Promise<User[]> {
+    const me = this.snap.me
+    return me ? this.backend.searchPeople(me.id, query) : Promise.resolve([])
+  }
+
   async createTribu(name: string): Promise<void> {
     const me = this.snap.me
     if (!me) return
@@ -633,12 +677,14 @@ export class AppState {
   async refreshSocial(): Promise<void> {
     const me = this.snap.me
     if (!me) return
-    const [alliances, tribus, blockedUsers] = await Promise.all([
+    const [alliances, tribus, blockedUsers, follow, feed] = await Promise.all([
       this.backend.allianceOverview(me.id),
       this.backend.tribus(me.id),
       this.backend.blockedUsers(me.id),
+      this.backend.followOverview(me.id),
+      this.backend.feed(me.id),
     ])
-    this.set({ alliances, tribus, blockedUsers })
+    this.set({ alliances, tribus, blockedUsers, follow, feed })
     await this.refreshEchoes()
   }
 
