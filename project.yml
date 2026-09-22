@@ -1,0 +1,35 @@
+# Projet Xcode généré avec XcodeGen (https://github.com/yonaskolb/XcodeGen) :
+#   brew install xcodegen && xcodegen generate && open GOAT.xcodeproj
+# Toute la logique est dans le package local (Sources/GOATCore, Sources/GOATUI) ;
+# l'app iOS n'est qu'une coque qui l'embarque.
+name: GOAT
+options:
+  bundleIdPrefix: fr.neev
+  deploymentTarget:
+    iOS: "17.0"
+  createIntermediateGroups: true
+packages:
+  GOATKit:
+    path: .
+targets:
+  GOAT:
+    type: application
+    platform: iOS
+    sources: [App]
+    dependencies:
+      - package: GOATKit
+        product: GOATUI
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: fr.neev.goat
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        SWIFT_VERSION: "5.0"
+        TARGETED_DEVICE_FAMILY: "1" # iPhone uniquement
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: GOAT
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait
+        INFOPLIST_KEY_NSLocationWhenInUseUsageDescription: >-
+          GOAT utilise ta position pendant une session de sport pour t'afficher sur la carte
+          avec une position approximative (~150 m). Elle n'est jamais partagée avec précision.

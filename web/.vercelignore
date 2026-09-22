@@ -1,0 +1,5 @@
+# Le déploiement est reconstruit sur Vercel (npm install + npm run build) : inutile d'envoyer ça.
+node_modules
+dist
+.vite
+*.tsbuildinfo

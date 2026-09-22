@@ -1,0 +1,146 @@
+import { useState } from 'react'
+import { sportName } from '../core/sports'
+import type { User } from '../core/models'
+import { userSportIDs } from '../core/models'
+import { useApp } from '../state/context'
+import { Avatar, PageHead, Panel, Sheet } from './common'
+import { Icon } from './Icon'
+import { MiniProfileSheet } from './sheets'
+
+export function AlliancesTab() {
+  const { app, snap } = useApp()
+  const [profileID, setProfileID] = useState<string | null>(null)
+  const [newTribu, setNewTribu] = useState(false)
+  const { alliances, tribus } = snap
+
+  const person = (user: User) => (
+    <button className="row-button person" onClick={() => setProfileID(user.id)}>
+      <Avatar name={user.firstName} photo={user.photoData} size={40} />
+      <span className="row-main">
+        <span className="row-title">{user.firstName}</span>
+        <span className="row-sub">{userSportIDs(user).map(sportName).join(' · ')}</span>
+      </span>
+    </button>
+  )
+
+  return (
+    <>
+      <PageHead
+        title="Alliances"
+        action={
+          <button className="icon-btn big" aria-label="Nouvelle tribu" onClick={() => setNewTribu(true)}>
+            <Icon name="plus" />
+          </button>
+        }
+      />
+
+      {alliances.incoming.length > 0 && (
+        <Panel title="Demandes reçues" count={alliances.incoming.length}>
+          {alliances.incoming.map((entry) => (
+            <div className="row" key={entry.alliance.id}>
+              {person(entry.other)}
+              <button className="round ok" aria-label={`Accepter ${entry.other.firstName}`} onClick={() => void app.respondToAlliance(entry.alliance.id, true)}>
+                <Icon name="check" size={18} />
+              </button>
+              <button className="round" aria-label={`Refuser ${entry.other.firstName}`} onClick={() => void app.respondToAlliance(entry.alliance.id, false)}>
+                <Icon name="x" size={18} />
+              </button>
+            </div>
+          ))}
+        </Panel>
+      )}
+
+      <Panel title="Alliés" count={alliances.allies.length}>
+        {alliances.allies.length === 0 && <p className="row-empty">Pas encore d'Alliance. Touche un pin de la carte ou un Echo pour en demander une.</p>}
+        {alliances.allies.map((entry) => (
+          <div className="row" key={entry.alliance.id}>
+            {person(entry.other)}
+          </div>
+        ))}
+      </Panel>
+
+      {alliances.outgoing.length > 0 && (
+        <Panel title="Demandes envoyées" count={alliances.outgoing.length}>
+          {alliances.outgoing.map((entry) => (
+            <div className="row" key={entry.alliance.id}>
+              {person(entry.other)}
+              <span className="row-note">En attente</span>
+            </div>
+          ))}
+        </Panel>
+      )}
+
+      <Panel title="Mes tribus" count={tribus.mine.length}>
+        {tribus.mine.length === 0 && <p className="row-empty">Tu n'as rejoint aucune tribu.</p>}
+        {tribus.mine.map((tribu) => (
+          <div className="row" key={tribu.id}>
+            <span className="tribu-icon" aria-hidden="true">🔥</span>
+            <div className="row-main">
+              <div className="row-title">{tribu.name}</div>
+              <div className="row-sub">
+                {tribu.memberIDs.length} membre{tribu.memberIDs.length > 1 ? 's' : ''}
+              </div>
+            </div>
+            <button className="btn btn-small btn-danger" onClick={() => void app.leaveTribu(tribu.id)}>
+              Quitter
+            </button>
+          </div>
+        ))}
+      </Panel>
+
+      {tribus.discover.length > 0 && (
+        <Panel title="Tribus à rejoindre" count={tribus.discover.length}>
+          {tribus.discover.map((tribu) => (
+            <div className="row" key={tribu.id}>
+              <span className="tribu-icon" aria-hidden="true">🔥</span>
+              <div className="row-main">
+                <div className="row-title">{tribu.name}</div>
+              </div>
+              <button className="btn btn-small" onClick={() => void app.joinTribu(tribu.id)}>
+                Rejoindre
+              </button>
+            </div>
+          ))}
+        </Panel>
+      )}
+
+      {profileID && <MiniProfileSheet userID={profileID} onClose={() => setProfileID(null)} />}
+      {newTribu && <NewTribuSheet onClose={() => setNewTribu(false)} />}
+    </>
+  )
+}
+
+function NewTribuSheet({ onClose }: { onClose: () => void }) {
+  const { app } = useApp()
+  const [name, setName] = useState('')
+  const submit = async () => {
+    if (!name.trim()) return
+    await app.createTribu(name)
+    onClose()
+  }
+  return (
+    <Sheet title="Nouvelle tribu" onClose={onClose}>
+      <form
+        onSubmit={(event) => {
+          event.preventDefault()
+          void submit()
+        }}
+      >
+        <input
+          className="input"
+          placeholder="Nom de la tribu"
+          value={name}
+          maxLength={40}
+          autoFocus
+          enterKeyHint="done"
+          onChange={(e) => setName(e.target.value)}
+        />
+        <div className="actions">
+          <button type="submit" className="btn btn-primary btn-block btn-large" disabled={!name.trim()}>
+            Créer
+          </button>
+        </div>
+      </form>
+    </Sheet>
+  )
+}
